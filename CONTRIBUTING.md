@@ -46,3 +46,13 @@ Add a test with every bug fix: a test that fails before the fix and passes after
 ## Pull requests
 
 Keep each pull request to one change, describe what it changes for someone using Tactile, and make sure `swift run tactile-checks` passes.
+
+## Releasing
+
+1. Set the new version in `Packaging/Info.plist` (`CFBundleShortVersionString`, e.g. `1.1.0`) and commit it.
+2. Tag the commit with release notes as the tag message, and push the tag:
+   ```sh
+   git tag -s v1.1.0
+   git push origin v1.1.0
+   ```
+3. The **Release** workflow runs the checks, builds a universal `Tactile.app`, and publishes it with a checksum (and, for public repositories, a build provenance attestation). It refuses a tag that doesn't match the version in `Info.plist`.

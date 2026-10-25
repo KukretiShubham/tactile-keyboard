@@ -1,0 +1,52 @@
+# Publishes a release when a version tag (e.g. v1.0.0) is pushed: runs the
+# checks, builds a universal Tactile.app, and attaches it as a zip with its
+# SHA-256 checksum and a build provenance attestation, so anyone can verify the
+# download was built here from the tagged code. The release notes are the
+# tag's message.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check the tag matches the app's version
+        run: |
+          version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Packaging/Info.plist)"
+          if [[ "v$version" != "$GITHUB_REF_NAME" ]]; then
+            echo "::error::Packaging/Info.plist says $version, but the tag is $GITHUB_REF_NAME."
+            exit 1
+          fi
+      - name: Run the checks
+        run: swift run tactile-checks
+      - name: Build Tactile.app
+        run: UNIVERSAL=1 scripts/build-app.sh
+      - name: Package
+        run: |
+          zip="Tactile-$GITHUB_REF_NAME.zip"
+          ditto -c -k --keepParent build/Tactile.app "$zip"
+          shasum -a 256 "$zip" > "$zip.sha256"
+      # GitHub only offers attestations for public repositories on personal plans.
+      - name: Attest build provenance
+        if: github.event.repository.visibility == 'public'
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: Tactile-${{ github.ref_name }}.zip
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "Tactile-$GITHUB_REF_NAME.zip" "Tactile-$GITHUB_REF_NAME.zip.sha256" \
+            --title "Tactile ${GITHUB_REF_NAME#v}" --notes-from-tag --verify-tag

@@ -6,6 +6,8 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/KukretiShubham/tactile-keyboard/actions/workflows/checks.yml"><img alt="Checks" src="https://github.com/KukretiShubham/tactile-keyboard/actions/workflows/checks.yml/badge.svg"></a>
+  <a href="https://github.com/KukretiShubham/tactile-keyboard/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/KukretiShubham/tactile-keyboard"></a>
   <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue">
   <img alt="macOS 15 or later" src="https://img.shields.io/badge/macOS-15%2B-black">
   <img alt="Swift 6" src="https://img.shields.io/badge/Swift-6-orange">
@@ -44,22 +46,49 @@ Midnight Glow comes in eight glow colors:
 
 ## Getting started
 
-You need a Mac with **macOS 15 or later** and Apple's free developer tools, plus an iPad (any device with a modern browser works) on the same Wi-Fi network or the same [Tailscale](https://tailscale.com) network.
+You need a Mac with **macOS 15 or later**, plus an iPad (any device with a modern browser works) on the same Wi-Fi network or the same [Tailscale](https://tailscale.com) network.
 
-1. **Install the developer tools**, if you don't have Xcode:
+### Download (easiest)
+
+1. **Download** `Tactile-<version>.zip` from the [latest release](https://github.com/KukretiShubham/tactile-keyboard/releases/latest), unzip it, and move **Tactile.app** to Applications. It runs on Apple silicon and Intel Macs.
+2. **Open it the first time:** Tactile is free and open source, so it isn't notarized by Apple, and macOS blocks it at first. Open it once, then go to System Settings → Privacy & Security, scroll down, and click **Open Anyway** next to Tactile.
+3. **Allow Accessibility:** macOS asks you to allow Tactile in System Settings → Privacy & Security → Accessibility. Every app that types or moves the pointer needs this.
+4. **Pair your iPad:** click the Tactile icon in the menu bar, choose **Pair a Device…**, and scan the QR code with the iPad's camera.
+
+Then tap Share → **Add to Home Screen** on the iPad for a full-screen app without Safari's toolbar.
+
+When you install a newer version, switch Tactile off and on again under Accessibility: macOS treats each download as a new app.
+
+<details>
+<summary>Check that a download is genuine</summary>
+
+Each release lists a SHA-256 checksum next to the zip; compare it with:
+
+```sh
+shasum -a 256 Tactile-v1.0.0.zip
+```
+
+Releases are built by GitHub Actions from the tagged code, with a signed build provenance attestation. With the [GitHub CLI](https://cli.github.com):
+
+```sh
+gh attestation verify Tactile-v1.0.0.zip --repo KukretiShubham/tactile-keyboard
+```
+
+</details>
+
+### Build it yourself
+
+1. **Install Apple's developer tools**, if you don't have Xcode:
    ```sh
    xcode-select --install
    ```
-2. **Download Tactile:**
+2. **Download the code:**
    ```sh
    git clone https://github.com/KukretiShubham/tactile-keyboard.git
    cd tactile-keyboard
    ```
 3. **Build and open it:** double-click `start-tactile.command` (or run `./start-tactile.command`). It builds **Tactile.app** and opens it in your menu bar. The first build takes a few minutes. You can move `build/Tactile.app` to Applications afterwards.
-4. **Allow Accessibility:** macOS asks you to allow Tactile in System Settings → Privacy & Security → Accessibility. Every app that types or moves the pointer needs this.
-5. **Pair your iPad:** click the Tactile icon in the menu bar, choose **Pair a Device…**, and scan the QR code with the iPad's camera.
-
-Then tap Share → **Add to Home Screen** on the iPad for a full-screen app without Safari's toolbar.
+4. Allow Accessibility and pair your iPad, as in steps 3 and 4 above.
 
 ### Connecting over Tailscale (recommended)
 
@@ -78,7 +107,7 @@ Without Tailscale, Tactile uses its own certificate, which each iPad trusts once
 2. Follow the steps there: download the certificate, install the profile in Settings (check that its SHA-256 fingerprint matches the one in Tactile's menu; hold ⌥ while opening it), and turn on full trust under General → About → Certificate Trust Settings.
 3. Open Tactile and enter the pairing code. The iPad is remembered from then on.
 
-### Keep Accessibility allowed when you rebuild
+### Keep Accessibility allowed when you rebuild it yourself
 
 macOS ties the Accessibility permission to the app's signature. To avoid approving Tactile again after every update, run this once:
 

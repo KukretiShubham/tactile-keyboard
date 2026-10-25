@@ -1,0 +1,30 @@
+# Builds Tactile and runs its checks (Swift and web) on every push to main and
+# every pull request.
+name: Checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Show the Swift version
+        run: swift --version
+      - name: Build
+        run: swift build
+      - name: Run the checks
+        run: swift run tactile-checks
