@@ -4,7 +4,7 @@ import { createFloating, HANDLE_SPACE } from './floating.js';
 import { createKeyboard } from './keyboard.js';
 import { settings, storage } from './settings.js';
 import { setupSheets } from './sheets.js';
-import { createShortcutBar } from './shortcuts.js';
+import { createShortcuts } from './shortcuts.js';
 import { createTrackpad } from './trackpad.js';
 import { TypingModel } from './typing-model.js';
 import { clamp, contentBox } from './util.js';
@@ -15,6 +15,11 @@ const app = document.getElementById('app');
 const stage = document.getElementById('stage');
 const status = document.getElementById('status');
 const statusLabel = document.getElementById('statusLabel');
+const soundHint = document.getElementById('soundHint');
+const toolbar = document.querySelector('.toolbar');
+const toolbarActions = document.querySelector('.toolbar-actions');
+const palmLeft = document.getElementById('palmLeft');
+const palmRight = document.getElementById('palmRight');
 const themeColor = document.querySelector('meta[name="theme-color"]');
 const prefersDark = matchMedia('(prefers-color-scheme: dark)');
 
@@ -46,7 +51,11 @@ const trackpad = createTrackpad(document.getElementById('trackpad'), {
   onClick: () => keyboard.releaseLatched(),
   isCongested: () => connection.congested,
 });
-const shortcutBar = createShortcutBar(document.getElementById('shortcutBar'), {
+const shortcuts = createShortcuts({
+  bar: document.getElementById('shortcutBar'),
+  left: document.getElementById('shortcutsLeft'),
+  right: document.getElementById('shortcutsRight'),
+}, {
   send, feedback, settings,
   beforeSend: () => keyboard.releaseLatched(),
 });
@@ -56,7 +65,7 @@ const sheets = setupSheets({ connection, feedback, typingModel });
 let macLabels = {};
 function applyLabels() {
   keyboard.setLabels(settings.get('macLabels') ? macLabels : {});
-  shortcutBar.setLabels(macLabels);
+  shortcuts.setLabels(macLabels);
 }
 connection.addEventListener('layout', ({ detail }) => {
   macLabels = detail;
@@ -85,11 +94,12 @@ function fit() {
   app.dataset.functionRow = functionRow ? 'on' : 'off';
   app.dataset.position = settings.get('keyboardPosition');
   app.dataset.size = size;
-  // In landscape, height is what's scarce: with the trackpad showing, the top
-  // bar's controls float over the trackpad's top corners instead of taking a
-  // row of their own.
-  const overlay = layout === 'both' && innerWidth > innerHeight;
-  app.dataset.controls = overlay ? 'overlay' : 'bar';
+  // In landscape, height is what's scarce: with the trackpad showing, it sits
+  // centred like a MacBook's, and the top bar's controls move to the palm
+  // rests either side of it instead of taking a row of their own.
+  const palmRests = layout === 'both' && innerWidth > innerHeight;
+  app.dataset.controls = palmRests ? 'palm' : 'bar';
+  placeControls(palmRests);
   const { width, height, paddingLeft, paddingTop } = contentBox(stage);
 
   const gap = clamp(width * 0.0055, 4, 8);
@@ -131,13 +141,6 @@ function fit() {
   root.style.setProperty('--deck-pad', `${pad.toFixed(1)}px`);
   root.style.setProperty('--stage-gap', `${stageGap.toFixed(1)}px`);
 
-  if (overlay) {
-    const pad = document.getElementById('trackpad').getBoundingClientRect();
-    root.style.setProperty('--controls-top', `${Math.round(pad.top + 10)}px`);
-    root.style.setProperty('--controls-left', `${Math.round(pad.left + 10)}px`);
-    root.style.setProperty('--controls-right', `${Math.round(innerWidth - pad.right + 10)}px`);
-  }
-
   if (floats) {
     // Centre the keyboard on its saved spot, kept fully on screen.
     const deckWidth = deck.offsetWidth;
@@ -149,6 +152,22 @@ function fit() {
   } else {
     deck.style.left = deck.style.top = '';
   }
+}
+
+// Moves the status, buttons and shortcuts between the top bar and the palm
+// rests beside the trackpad.
+let controlsOnPalmRests = false;
+function placeControls(onPalmRests) {
+  if (onPalmRests === controlsOnPalmRests) return;
+  controlsOnPalmRests = onPalmRests;
+  if (onPalmRests) {
+    palmLeft.prepend(status, soundHint);
+    palmRight.prepend(toolbarActions);
+  } else {
+    toolbar.prepend(status, soundHint);
+    toolbar.append(toolbarActions);
+  }
+  shortcuts.placeBesideTrackpad(onPalmRests);
 }
 
 settings.subscribe((key) => {
@@ -202,7 +221,6 @@ for (const type of ['pointerup', 'touchend', 'click', 'keydown']) {
 }
 
 // If Safari still hasn't allowed sound, say so instead of staying silent.
-const soundHint = document.getElementById('soundHint');
 const showSoundHint = () => { soundHint.hidden = !feedback.needsTap; };
 feedback.addEventListener('state', showSoundHint);
 soundHint.addEventListener('click', () => feedback.preview());
@@ -220,8 +238,11 @@ document.addEventListener('visibilitychange', () => {
 // ignores user-scalable=no, so several fingers on the keys would pinch-zoom or
 // double-tap-zoom the page unless the raw touch events are cancelled here.
 // Pointer events (which the keyboard and trackpad use) still fire.
+// Buttons beside the trackpad are left alone, so their taps still click.
 for (const type of ['touchstart', 'touchmove', 'touchend']) {
-  stage.addEventListener(type, (event) => event.preventDefault(), { passive: false });
+  stage.addEventListener(type, (event) => {
+    if (!event.target.closest('button')) event.preventDefault();
+  }, { passive: false });
 }
 for (const type of ['gesturestart', 'gesturechange', 'gestureend']) {
   document.addEventListener(type, (event) => event.preventDefault(), { passive: false });

@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/midnight.jpg" alt="Tactile on an iPad in landscape: a full Mac keyboard with glowing blue key edges above a trackpad, with a shortcut bar of Mac shortcuts" width="900">
+  <img src="docs/images/midnight.jpg" alt="Tactile on an iPad in landscape: a full Mac keyboard with glowing blue key edges, and below it a centred trackpad with large shortcut keys on either side" width="900">
 </p>
 
 Put your Mac on a stand, keep the iPad in front of you, and type and point with it like a laptop. Tactile is a tiny menu bar app for the Mac and a web page for the iPad. Scan a QR code and you're typing; there's nothing to install from the App Store.
@@ -25,7 +25,7 @@ Put your Mac on a stand, keep the iPad in front of you, and type and point with 
 - **It learns your aim.** Glass has no edges to feel, so Tactile quietly learns where you actually press each key and shifts its touch area to match.
 - **Rest your fingers.** Fingers resting on the keys don't type; keys type when you lift. Rolled keys still come out in the right order.
 - **A proper trackpad.** Tap to click, two-finger click, two-finger scroll with momentum, pinch to zoom, drag, three-finger drag, and swipes for Spaces, Mission Control and App Exposé.
-- **Shortcuts in one tap.** A shortcut bar for Undo, Redo, Copy, Paste, Switch App, Screenshot, Mission Control, Spotlight and more. You pick which.
+- **Laid out like a MacBook.** In landscape the trackpad sits centred below the keyboard, and the palm rests either side hold big shortcut keys: Undo, Redo, Copy, Paste, Switch App, Screenshot, Mission Control, Spotlight and more. You pick which.
 - **Private and secure.** Everything stays between your iPad and your Mac, encrypted with TLS. Pairing takes a one-time code, and over Tailscale only your own devices can connect.
 - **Nothing to patch.** No third-party packages on either side: Apple frameworks on the Mac, plain HTML, CSS and JavaScript on the iPad.
 
@@ -115,10 +115,10 @@ Tap the settings button (top right):
 
 - **Keyboard skin:** Midnight Glow (eight glow colors), Space Black, Silver, Frosted Glass, or Automatic.
 - **Keyboard:** Key Height, Function Row, Rest Fingers on Keys, Key Popups, **Adapt to My Typing** (with Reset Typing Learning), and **Match Mac Layout**.
-- **Shortcut Bar:** turn it on or off and choose its shortcuts. Letter shortcuts follow your Mac's layout, so ⌘Z is still ⌘Z on AZERTY.
+- **Shortcuts:** turn them on or off and choose which appear. In landscape with the trackpad they're keys on either side of the trackpad, half on each side; otherwise they sit along the top. Letter shortcuts follow your Mac's layout, so ⌘Z is still ⌘Z on AZERTY.
 - **Feedback:** key sounds, Soft, Crisp or Thock, volume, Sound in Silent Mode, and vibration on devices that have it.
 - **Trackpad:** tracking speed, scrolling speed, natural scrolling, Pinch to Zoom, Three-Finger Drag.
-- **Layout:** keyboard, trackpad or both; keyboard at the top, middle or bottom; **Expanded** or **Floating** keyboard; **Keep Screen Awake** (the iPad stays on while you use it, and sleeps normally after 10 idle minutes).
+- **Layout:** keyboard, trackpad or both (in landscape, both gives the MacBook-style layout with the trackpad centred); keyboard at the top, middle or bottom; **Expanded** or **Floating** keyboard; **Keep Screen Awake** (the iPad stays on while you use it, and sleeps normally after 10 idle minutes).
 
 ### The menu bar
 

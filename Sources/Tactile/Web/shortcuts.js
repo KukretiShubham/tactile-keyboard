@@ -1,5 +1,6 @@
-// The shortcut bar: one tap for the Mac shortcuts you use most. Which ones
-// show is chosen in Settings.
+// One-tap Mac shortcuts. In landscape with the trackpad showing they're keys
+// on either side of the trackpad, like a MacBook's palm rests; otherwise
+// they're a bar along the top. Which ones show is chosen in Settings.
 import { ICONS } from './icons.js';
 import { codeForCharacter } from './keys.js';
 import { el } from './util.js';
@@ -30,30 +31,42 @@ export function shortcutMessage(shortcut, labels = {}) {
   return { t: 'combo', ks: shortcut.keys.map((key) => (key.length === 1 ? codeForCharacter(labels, key) : key)) };
 }
 
-/** Fills `bar` with the chosen shortcuts and keeps it in step with Settings. */
-export function createShortcutBar(bar, { send, feedback, settings, beforeSend }) {
+/**
+ * Shows the chosen shortcuts in `bar`, or split between `left` and `right`
+ * beside the trackpad, and keeps them in step with Settings.
+ */
+export function createShortcuts({ bar, left, right }, { send, feedback, settings, beforeSend }) {
   let labels = {};
+  let besideTrackpad = false;
+
+  // `position` is where the key sits, from -1 (left) to 1 (right), for its sound.
+  function button(shortcut, position) {
+    const chip = el('button', {
+      className: besideTrackpad ? 'shortcut' : 'shortcut glass',
+      attrs: { 'aria-label': shortcut.name, title: shortcut.name },
+    },
+    shortcut.icon
+      ? el('span', { className: 'shortcut-glyph shortcut-icon', html: shortcut.icon })
+      : el('span', { className: 'shortcut-glyph', text: shortcut.glyph }),
+    el('span', { className: 'shortcut-name', text: shortcut.name }));
+    chip.addEventListener('click', () => {
+      beforeSend();
+      send(shortcutMessage(shortcut, labels));
+      if (besideTrackpad) feedback.key('key', position);
+      else feedback.click();
+    });
+    return chip;
+  }
 
   function render() {
     const chosen = new Set(settings.get('shortcuts'));
     const shown = settings.get('shortcutBar') ? SHORTCUTS.filter(({ id }) => chosen.has(id)) : [];
-    bar.hidden = shown.length === 0;
-    bar.replaceChildren(...shown.map((shortcut) => {
-      const chip = el('button', {
-        className: 'shortcut glass',
-        attrs: { 'aria-label': shortcut.name, title: shortcut.name },
-      },
-      shortcut.icon
-        ? el('span', { className: 'shortcut-glyph shortcut-icon', html: shortcut.icon })
-        : el('span', { className: 'shortcut-glyph', text: shortcut.glyph }),
-      el('span', { className: 'shortcut-name', text: shortcut.name }));
-      chip.addEventListener('click', () => {
-        beforeSend();
-        send(shortcutMessage(shortcut, labels));
-        feedback.click();
-      });
-      return chip;
-    }));
+    const half = Math.ceil(shown.length / 2);
+    const place = (list, position) => (besideTrackpad ? list.map((shortcut) => button(shortcut, position)) : []);
+    left.replaceChildren(...place(shown.slice(0, half), -0.9));
+    right.replaceChildren(...place(shown.slice(half), 0.9));
+    bar.replaceChildren(...(besideTrackpad ? [] : shown.map((shortcut) => button(shortcut, 0))));
+    bar.hidden = besideTrackpad || shown.length === 0;
   }
 
   settings.subscribe((key) => { if (key === 'shortcuts' || key === 'shortcutBar') render(); });
@@ -61,5 +74,11 @@ export function createShortcutBar(bar, { send, feedback, settings, beforeSend })
   return {
     /** The Mac's keyboard layout changed (see keys.js `applyLabels`). */
     setLabels: (next) => { labels = next; },
+    /** Moves the shortcuts beside the trackpad, or back to the top bar. */
+    placeBesideTrackpad(on) {
+      if (on === besideTrackpad) return;
+      besideTrackpad = on;
+      render();
+    },
   };
 }

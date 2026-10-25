@@ -253,50 +253,105 @@ html { touch-action: none; }
   pointer-events: none;
   container-type: inline-size;
 }
-.shortcut { pointer-events: auto; }
 .shortcut-bar[hidden] { display: none; }
-/* Centred, but if it ever overflows, the first chip stays visible. */
-.shortcut:first-child { margin-left: auto; }
-.shortcut:last-child { margin-right: auto; }
 .shortcut {
-  flex: none;
   display: flex;
   align-items: center;
+  font: inherit;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.shortcut-glyph { font-variant-numeric: tabular-nums; }
+.shortcut-icon svg { display: block; }
+
+/* In the top bar: glass chips. Centred, but if the bar ever overflows, the
+   first chip stays visible. */
+.shortcut-bar .shortcut {
+  flex: none;
   gap: 6px;
   height: 44px;
   padding: 0 14px;
   border-radius: 22px;
   color: var(--text);
-  font: inherit;
   font-size: 14px;
   font-weight: 590;
-  cursor: pointer;
   transition: transform 160ms var(--ease);
 }
-.shortcut:active { transform: scale(0.94); }
-.shortcut-glyph { color: var(--accent); font-variant-numeric: tabular-nums; }
-.shortcut-icon svg { width: 20px; height: 20px; display: block; }
+.shortcut-bar .shortcut:first-child { margin-left: auto; }
+.shortcut-bar .shortcut:last-child { margin-right: auto; }
+.shortcut-bar .shortcut:active { transform: scale(0.94); }
+.shortcut-bar .shortcut-glyph { color: var(--accent); }
+.shortcut-bar .shortcut-icon svg { width: 20px; height: 20px; }
 @container (max-width: 1000px) {
-  .shortcut-name { display: none; }
-  .shortcut { padding: 0 12px; }
+  .shortcut-bar .shortcut-name { display: none; }
+  .shortcut-bar .shortcut { padding: 0 12px; }
 }
+
+/* Beside the trackpad: keys, drawn like the keyboard's own in every skin. */
+.shortcut-keys {
+  flex: 1;
+  min-height: 0;
+  align-self: stretch;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-auto-rows: minmax(0, 1fr);
+  gap: var(--g);
+}
+.shortcut-keys .shortcut {
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  min-height: 0;
+  padding: 4px;
+  border-radius: calc(var(--u) * 0.16);
+  background: var(--key-bg);
+  border: 1px solid var(--key-border);
+  box-shadow: var(--key-shadow);
+  color: var(--legend);
+  text-shadow: var(--legend-glow);
+  font: 500 22px / 1 var(--font);
+  transition: transform 140ms var(--ease), box-shadow 220ms ease, background 220ms ease, border-color 220ms ease;
+}
+.shortcut-keys .shortcut:active {
+  transform: translateY(1px) scale(0.965);
+  background: var(--key-bg-pressed);
+  border-color: var(--key-border-pressed);
+  box-shadow: var(--key-shadow-pressed);
+  transition-duration: 40ms;
+}
+.shortcut-keys .shortcut-icon svg { width: 26px; height: 26px; }
+.shortcut-keys .shortcut-name { font-size: 12px; text-align: center; opacity: 0.75; }
+[data-skin="midnight"] .shortcut-keys .shortcut-glyph { filter: drop-shadow(0 0 6px var(--glow)); }
 .row-detail { margin-left: auto; color: var(--text-2); font-size: 15px; }
 
-/* Landscape with the trackpad: the controls float over the trackpad's top
-   corners (placed by app.js), freeing the row the top bar used. Buttons keep
-   their 44 pt size; only they take touches, the rest of the trackpad works. */
-[data-controls="overlay"] .toolbar {
-  position: absolute;
-  z-index: 3;
-  top: var(--controls-top, 10px);
-  left: var(--controls-left, 10px);
-  right: var(--controls-right, 10px);
-  padding: 0;
-  pointer-events: none;
+/* Landscape with the trackpad: like a MacBook, the trackpad sits centred
+   below the keyboard at half its width. The status, buttons and shortcuts move
+   (placed by app.js) to the palm rests either side, freeing the row the top
+   bar used. Elsewhere the palm row steps aside and the trackpad spans the
+   keyboard's width. */
+.palm { display: contents; }
+.palm-side { display: none; }
+[data-controls="palm"] .toolbar { display: none; }
+[data-controls="palm"] .stage { padding-top: max(12px, env(safe-area-inset-top)); }
+[data-controls="palm"] .palm {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 50% 1fr;
+  gap: var(--stage-gap);
+  width: var(--deck-width);
+  max-width: 100%;
 }
-[data-controls="overlay"] .toolbar > :not(.shortcut-bar) { pointer-events: auto; }
-[data-controls="overlay"] .stage { padding-top: max(12px, env(safe-area-inset-top)); }
-[data-controls="overlay"] .trackpad-hint { bottom: 12px; }
+[data-controls="palm"] .palm .trackpad { width: auto; min-height: 0; }
+[data-controls="palm"] .palm-side {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  min-height: 0;
+}
+.palm-right { align-items: flex-end; }
+[data-controls="palm"] .trackpad-hint { bottom: 12px; }
 
 /* ───────────────────────── Stage ───────────────────────── */
 
@@ -309,6 +364,7 @@ html { touch-action: none; }
   justify-content: flex-start;
   gap: var(--stage-gap);
   padding: 14px max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  --deck-width: calc(14.5 * var(--u) + 13.5 * var(--g) + 2 * var(--deck-pad));
 }
 
 /* Keyboard position: with the trackpad, "bottom" docks the keys at the bottom
@@ -536,9 +592,8 @@ html { touch-action: none; }
   position: relative;
   flex: 1;
   min-height: 140px;
-  /* As wide as the keyboard: on a touch screen, more trackpad is better than
-     empty space beside it. */
-  width: calc(14.5 * var(--u) + 13.5 * var(--g) + 2 * var(--deck-pad));
+  /* As wide as the keyboard, except in landscape with palm rests (see .palm). */
+  width: var(--deck-width);
   max-width: 100%;
   overflow: hidden;
   border-radius: calc(var(--u) * 0.3);

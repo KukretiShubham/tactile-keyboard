@@ -35,9 +35,19 @@
 
     <main class="stage" id="stage">
       <section class="deck" id="keyboard" aria-label="Keyboard"></section>
-      <section class="trackpad" id="trackpad" aria-label="Trackpad">
-        <p class="trackpad-hint">Tap to click · Two fingers to scroll or pinch · Hold, then move to drag</p>
-      </section>
+      <!-- In landscape with both showing, the trackpad sits centred like a
+           MacBook's, with the status, buttons and shortcuts either side. -->
+      <div class="palm">
+        <aside class="palm-side" id="palmLeft" aria-label="Status and shortcuts">
+          <div class="shortcut-keys" id="shortcutsLeft"></div>
+        </aside>
+        <section class="trackpad" id="trackpad" aria-label="Trackpad">
+          <p class="trackpad-hint">Tap to click · Two fingers to scroll or pinch · Hold, then move to drag</p>
+        </section>
+        <aside class="palm-side palm-right" id="palmRight" aria-label="Shortcuts and settings">
+          <div class="shortcut-keys" id="shortcutsRight"></div>
+        </aside>
+      </div>
     </main>
   </div>
 
@@ -89,11 +99,12 @@
         <p class="group-footer">With Rest Fingers on, keys type when you lift your finger, so fingers resting on the keys don't type. Delete and the arrow keys still repeat when held.</p>
         <p class="group-footer">Adapt to My Typing learns where you press each key and moves its touch area to match, on this iPad only. Match Mac Layout labels the keys for the keyboard layout your Mac uses, such as AZERTY.</p>
 
-        <h3 class="group-title">Shortcut Bar</h3>
+        <h3 class="group-title">Shortcuts</h3>
         <div class="group">
-          <label class="row"><span class="row-label">Show Shortcut Bar</span><input type="checkbox" class="switch" data-setting="shortcutBar"></label>
+          <label class="row"><span class="row-label">Show Shortcuts</span><input type="checkbox" class="switch" data-setting="shortcutBar"></label>
         </div>
         <div class="group" id="shortcutList"></div>
+        <p class="group-footer">In landscape with the trackpad showing, shortcuts are keys on either side of the trackpad. Otherwise they sit along the top.</p>
 
         <h3 class="group-title">Feedback</h3>
         <div class="group">
