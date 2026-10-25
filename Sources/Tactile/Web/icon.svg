@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1c1c20"/>
+      <stop offset="1" stop-color="#050507"/>
+    </linearGradient>
+    <linearGradient id="cap" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#18181c"/>
+      <stop offset="1" stop-color="#0c0c0f"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="5"/>
+    </filter>
+  </defs>
+  <rect width="180" height="180" fill="url(#bg)"/>
+  <rect x="45" y="45" width="90" height="90" rx="20" fill="none" stroke="#0A84FF" stroke-width="5" filter="url(#glow)" opacity="0.9"/>
+  <rect x="45" y="45" width="90" height="90" rx="20" fill="url(#cap)" stroke="#4da3ff" stroke-width="2.5"/>
+  <text x="90" y="104" text-anchor="middle" font-family="-apple-system, Helvetica, sans-serif" font-size="44" fill="#dceaff">⌘</text>
+</svg>

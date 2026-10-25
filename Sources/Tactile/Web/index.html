@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en" data-skin="midnight">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Tactile">
+  <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#000000">
+  <title>Tactile</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <div class="app" id="app" data-layout="both">
+    <header class="toolbar">
+      <div class="status glass" id="status" data-state="connecting">
+        <span class="status-dot"></span>
+        <span class="status-label" id="statusLabel">Connecting…</span>
+      </div>
+      <div class="toolbar-actions">
+        <button class="glass round-button" id="textButton" aria-label="Type with iPad keyboard" data-icon="compose"></button>
+        <button class="glass round-button" id="settingsButton" aria-label="Settings" data-icon="settings"></button>
+      </div>
+    </header>
+
+    <main class="stage" id="stage">
+      <section class="deck" id="keyboard" aria-label="Keyboard"></section>
+      <section class="trackpad" id="trackpad" aria-label="Trackpad">
+        <p class="trackpad-hint">Tap to click · Two fingers to scroll · Hold, then move to drag</p>
+      </section>
+    </main>
+  </div>
+
+  <div class="scrim" id="pairSheet" hidden>
+    <div class="sheet glass" role="dialog" aria-modal="true" aria-labelledby="pairTitle">
+      <div class="sheet-badge" data-icon="keyboard"></div>
+      <h2 id="pairTitle">Pair with Your Mac</h2>
+      <p class="sheet-text">Enter the six-digit code shown in Terminal on your Mac.</p>
+      <input class="code-field" id="pairCode" inputmode="numeric" pattern="[0-9]*" maxlength="6"
+             autocomplete="one-time-code" aria-label="Pairing code" placeholder="000000">
+      <p class="sheet-error" id="pairError" role="alert"></p>
+      <button class="button-prominent" id="pairButton">Pair</button>
+    </div>
+  </div>
+
+  <div class="scrim" id="settingsSheet" hidden>
+    <div class="sheet sheet-form glass" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+      <div class="sheet-header">
+        <span></span>
+        <h2 id="settingsTitle">Settings</h2>
+        <button class="header-button prominent" data-close>Done</button>
+      </div>
+      <div class="sheet-scroll">
+        <h3 class="group-title">Keyboard Skin</h3>
+        <div class="skin-grid" id="skinGrid"></div>
+
+        <div class="group" id="glowGroup">
+          <div class="row">
+            <span class="row-label">Glow Color</span>
+            <div class="swatches" id="glowSwatches" role="radiogroup" aria-label="Glow color"></div>
+          </div>
+        </div>
+
+        <h3 class="group-title">Keyboard</h3>
+        <div class="group">
+          <div class="row">
+            <span class="row-label">Key Height</span>
+            <div class="segmented" data-setting="keyHeight">
+              <button data-value="standard">Standard</button><button data-value="tall">Tall</button>
+            </div>
+          </div>
+          <label class="row"><span class="row-label">Function Row</span><input type="checkbox" class="switch" data-setting="functionRow"></label>
+        </div>
+        <p class="group-footer">Hiding the function row leaves more room for taller keys.</p>
+
+        <h3 class="group-title">Feedback</h3>
+        <div class="group">
+          <label class="row"><span class="row-label">Key Sounds</span><input type="checkbox" class="switch" data-setting="sound"></label>
+          <div class="row">
+            <span class="row-label">Sound</span>
+            <div class="segmented" data-setting="soundProfile">
+              <button data-value="soft">Soft</button><button data-value="crisp">Crisp</button><button data-value="thock">Thock</button>
+            </div>
+          </div>
+          <label class="row"><span class="row-label">Volume</span><input type="range" class="slider" data-setting="volume" min="0" max="1" step="0.05"></label>
+          <label class="row"><span class="row-label">Vibration</span><input type="checkbox" class="switch" data-setting="vibration" id="vibrationSwitch"></label>
+        </div>
+        <p class="group-footer" id="vibrationNote"></p>
+
+        <h3 class="group-title">Trackpad</h3>
+        <div class="group">
+          <label class="row"><span class="row-label">Tracking Speed</span><input type="range" class="slider" data-setting="tracking" min="0.5" max="3" step="0.1"></label>
+          <label class="row"><span class="row-label">Natural Scrolling</span><input type="checkbox" class="switch" data-setting="naturalScroll"></label>
+        </div>
+
+        <h3 class="group-title">Layout</h3>
+        <div class="group">
+          <div class="row">
+            <span class="row-label">Show</span>
+            <div class="segmented" data-setting="layout">
+              <button data-value="both">Both</button><button data-value="keyboard">Keyboard</button><button data-value="trackpad">Trackpad</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="group">
+          <button class="row row-button destructive" id="forgetButton">Forget This iPad</button>
+        </div>
+        <p class="group-footer">You'll need the pairing code from your Mac to connect again.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="scrim" id="textSheet" hidden>
+    <div class="sheet sheet-form glass" role="dialog" aria-modal="true" aria-labelledby="textTitle">
+      <div class="sheet-header">
+        <button class="header-button" data-close>Cancel</button>
+        <h2 id="textTitle">Type on iPad</h2>
+        <button class="header-button prominent" id="textSend">Send</button>
+      </div>
+      <textarea class="text-field" id="textField" placeholder="Dictate, use emoji or autocorrect, then tap Send." autocapitalize="sentences"></textarea>
+    </div>
+  </div>
+</body>
+</html>
