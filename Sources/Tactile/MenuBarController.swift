@@ -1,39 +1,46 @@
 import AppKit
+import Carbon.HIToolbox
 import ServiceManagement
+import SwiftUI
 
 /// The Tactile icon in the menu bar, next to Wi-Fi and Control Center.
-/// Its menu shows what's connected and holds every control.
-final class MenuBarController: NSObject, NSMenuDelegate {
+/// Clicking it drops down a panel (in the style of the Wi-Fi menu) with the
+/// connected devices and every control.
+final class MenuBarController: NSObject {
     private let service: TactileService
     private let isApp: Bool
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     private let notifier: Notifier?
+    private let model = PanelModel()
+    private lazy var panel = StatusPanel(model: model)
+    private lazy var pairingWindow = PairingWindowController()
     private var state: TactileService.Snapshot?
     private var trusted = Accessibility.isTrusted(prompt: false)
-    private lazy var pairingWindow = PairingWindowController()
     private var trustTimer: Timer?
+    private var pauseHotKey: HotKey?
+    private var screenLocked = false
 
-    private let relative: RelativeDateTimeFormatter = {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .full
-        return formatter
-    }()
+    private let defaults = UserDefaults.standard
 
     init(service: TactileService, isApp: Bool) {
         self.service = service
         self.isApp = isApp
         notifier = isApp ? Notifier() : nil
+        defaults.register(defaults: ["pauseWhenLocked": true])
         super.init()
 
-        let menu = NSMenu()
-        menu.autoenablesItems = false
-        menu.delegate = self
-        statusItem.menu = menu
-        statusItem.button?.setAccessibilityLabel("Tactile")
+        if let button = statusItem.button {
+            button.setAccessibilityLabel("Tactile")
+            button.target = self
+            button.action = #selector(togglePanel)
+            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+        }
+        configureModel()
         updateIcon()
 
         service.observe { [weak self] state in
             self?.state = state
+            self?.model.state = state
             self?.updateIcon()
             self?.pairingWindow.update(state)
         }
@@ -45,26 +52,98 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             let now = Accessibility.isTrusted(prompt: false)
             if now != trusted {
                 trusted = now
+                model.trusted = now
                 updateIcon()
             }
         }
+
+        // ⌃⌥⌘P pauses or resumes input from any app.
+        pauseHotKey = HotKey(keyCode: kVK_ANSI_P, modifiers: controlKey | optionKey | cmdKey) { [weak self] in
+            self?.togglePause()
+        }
+        if pauseHotKey == nil { Log.warn("The ⌃⌥⌘P shortcut is taken by another app; pause from the menu instead.") }
+
+        watchScreenLock()
+    }
+
+    // MARK: Panel
+
+    @objc private func togglePanel() {
+        if panel.isVisible {
+            panel.dismiss()
+        } else if let button = statusItem.button {
+            model.loginAvailable = isApp
+            model.openAtLogin = isApp && SMAppService.mainApp.status == .enabled
+            model.showDetails = NSEvent.modifierFlags.contains(.option)
+            model.confirmingRevoke = nil
+            button.highlight(true)
+            panel.show(below: button) { button.highlight(false) }
+        }
+    }
+
+    private func configureModel() {
+        model.trusted = trusted
+        model.pauseWhenLocked = defaults.bool(forKey: "pauseWhenLocked")
+        model.notifyOnConnect = defaults.bool(forKey: "notifyOnConnect")
+        model.actions = PanelModel.Actions(
+            setRunning: { [weak self] on in on ? self?.service.start() : self?.service.stop() },
+            setPaused: { [weak self] on in self?.service.setPaused(on) },
+            setPauseWhenLocked: { [weak self] on in
+                guard let self else { return }
+                defaults.set(on, forKey: "pauseWhenLocked")
+                model.pauseWhenLocked = on
+                service.setLockPaused(on && screenLocked)
+            },
+            setUseTailscale: { [weak self] on in
+                self?.defaults.set(on, forKey: "useTailscale")
+                self?.service.setUseTailscale(on)
+            },
+            setNotify: { [weak self] on in
+                self?.defaults.set(on, forKey: "notifyOnConnect")
+                self?.model.notifyOnConnect = on
+            },
+            setOpenAtLogin: { [weak self] on in self?.setLoginItem(on) },
+            disconnect: { [weak self] id in self?.service.disconnect(id) },
+            reconnect: { [weak self] id in self?.service.reconnect(id) },
+            revoke: { [weak self] id in self?.service.revoke(id) },
+            pair: { [weak self] in
+                guard let self, let state else { return }
+                panel.dismiss()
+                pairingWindow.show(state)
+            },
+            copyTailscaleLink: { [weak self] in
+                guard let link = self?.state?.tailscaleURL else { return }
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(link, forType: .string)
+                self?.panel.dismiss()
+            },
+            allowAccessibility: { [weak self] in
+                self?.panel.dismiss()
+                NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+            },
+            showLog: { [weak self] in
+                self?.panel.dismiss()
+                let log = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
+                    .appendingPathComponent("Logs/Tactile.log")
+                NSWorkspace.shared.open(log)
+            },
+            quit: { [weak self] in
+                self?.service.stopAndWait()
+                NSApp.terminate(nil)
+            }
+        )
+        panel.shortcuts = [
+            "p": { [weak self] in self?.model.actions.pair() },
+            "q": { [weak self] in self?.model.actions.quit() },
+            ".": { [weak self] in self?.togglePause() },
+        ]
+    }
+
+    private func togglePause() {
+        service.setPaused(!(state?.paused ?? false))
     }
 
     // MARK: Icon
-
-    private var statusText: String {
-        guard let state else { return "Starting…" }
-        if !state.running { return "Stopped" }
-        if !trusted && !state.dryRun { return "Needs Accessibility access" }
-        if state.paused { return "Input paused" }
-        let names = connectedDevices.map(\.name)
-        return names.isEmpty ? "Waiting for an iPad" : "Connected: \(names.joined(separator: ", "))"
-    }
-
-    private var connectedDevices: [Pairing.Device] {
-        guard let state else { return [] }
-        return state.devices.filter { state.connected.contains($0.id) }
-    }
 
     private func updateIcon() {
         let symbol: String
@@ -72,9 +151,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             symbol = "keyboard.badge.ellipsis"
         } else if !trusted && state?.dryRun != true {
             symbol = "exclamationmark.triangle"
-        } else if state?.paused == true {
+        } else if state?.paused == true || state?.lockPaused == true {
             symbol = "pause.rectangle"
-        } else if !connectedDevices.isEmpty {
+        } else if state?.connected.isEmpty == false {
             symbol = "keyboard.fill"
         } else {
             symbol = "keyboard"
@@ -83,164 +162,60 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         image?.isTemplate = true
         statusItem.button?.image = image
         statusItem.button?.appearsDisabled = state?.running == false
-        statusItem.button?.toolTip = "Tactile — \(statusText)"
+        statusItem.button?.toolTip = "Tactile — \(tooltip)"
     }
 
-    // MARK: Menu
+    private var tooltip: String {
+        guard let state else { return "Starting…" }
+        if !state.running { return "Off" }
+        if !trusted && !state.dryRun { return "Needs Accessibility access" }
+        if state.paused { return "Input paused" }
+        if state.lockPaused { return "Paused while Mac is locked" }
+        let names = state.devices.filter { state.connected.contains($0.id) }.map(\.name)
+        return names.isEmpty ? "Waiting for a device" : "Connected: \(names.joined(separator: ", "))"
+    }
 
-    func menuNeedsUpdate(_ menu: NSMenu) {
-        menu.removeAllItems()
-        let running = state?.running == true
+    // MARK: Screen lock
 
-        menu.addItem(header("Tactile — \(statusText)"))
-        if running {
-            let connected = connectedDevices
-            if connected.isEmpty {
-                menu.addItem(note("No iPad connected"))
-            } else {
-                connected.forEach { menu.addItem(note("●  \($0.name)")) }
+    /// Pauses input while the Mac is locked or the screen saver is running,
+    /// if that option is on, and resumes when it's unlocked.
+    private func watchScreenLock() {
+        let center = DistributedNotificationCenter.default()
+        let locked = ["com.apple.screenIsLocked", "com.apple.screensaver.didstart"]
+        let unlocked = ["com.apple.screenIsUnlocked", "com.apple.screensaver.didstop"]
+        for (names, isLocked) in [(locked, true), (unlocked, false)] {
+            for name in names {
+                center.addObserver(forName: Notification.Name(name), object: nil, queue: .main) { [weak self] _ in
+                    guard let self else { return }
+                    screenLocked = isLocked
+                    service.setLockPaused(isLocked && defaults.bool(forKey: "pauseWhenLocked"))
+                }
             }
         }
-
-        menu.addItem(.separator())
-        menu.addItem(item("Show Pairing Code…", key: "p", enabled: running) { [weak self] in self?.showPairing() })
-        if let link = state?.tailscaleURL {
-            menu.addItem(item("Copy Tailscale Link") { Self.copy(link) })
-        }
-
-        menu.addItem(.separator())
-        let pause = item("Pause Input", key: ".", enabled: running) { [weak self] in
-            self?.service.setPaused(!(self?.state?.paused ?? false))
-        }
-        pause.state = state?.paused == true ? .on : .off
-        menu.addItem(pause)
-        menu.addItem(item(running ? "Stop Tactile" : "Start Tactile") { [weak self] in
-            guard let self else { return }
-            running ? service.stop() : service.start()
-        })
-
-        menu.addItem(.separator())
-        menu.addItem(devicesItem())
-        menu.addItem(settingsItem())
-        if !trusted && state?.dryRun != true {
-            menu.addItem(item("Allow Accessibility Access…") {
-                NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
-            })
-        }
-
-        menu.addItem(.separator())
-        menu.addItem(item("Quit Tactile", key: "q") { [weak self] in
-            self?.service.stopAndWait()
-            NSApp.terminate(nil)
-        })
     }
 
-    private func devicesItem() -> NSMenuItem {
-        let submenu = NSMenu()
-        submenu.autoenablesItems = false
-        let devices = state?.devices ?? []
-        if devices.isEmpty {
-            submenu.addItem(note("No paired devices"))
-        }
-        for device in devices {
-            let online = state?.connected.contains(device.id) == true
-            let detail = online ? "connected now" : "last used \(relative.localizedString(for: device.lastSeen, relativeTo: Date()))"
-            let entry = item("\(device.name) — \(detail)") { [weak self] in self?.confirmRevoke(device) }
-            entry.toolTip = "Paired \(device.pairedAt.formatted(date: .abbreviated, time: .shortened)). Choose to revoke."
-            submenu.addItem(entry)
-        }
-        submenu.addItem(.separator())
-        submenu.addItem(item("Revoke All…", enabled: !devices.isEmpty) { [weak self] in self?.confirmRevokeAll() })
+    // MARK: Login item
 
-        let parent = NSMenuItem(title: "Paired Devices", action: nil, keyEquivalent: "")
-        parent.submenu = submenu
-        return parent
-    }
-
-    private func settingsItem() -> NSMenuItem {
-        let submenu = NSMenu()
-        submenu.autoenablesItems = false
-        let defaults = UserDefaults.standard
-
-        let tailscale = item("Use Tailscale") { [weak self] in
-            let value = !defaults.bool(forKey: "useTailscale")
-            defaults.set(value, forKey: "useTailscale")
-            self?.service.setUseTailscale(value)
-        }
-        tailscale.state = state?.usesTailscale == true ? .on : .off
-        tailscale.toolTip = "Serve Tactile with a trusted Tailscale certificate when Tailscale is running."
-        submenu.addItem(tailscale)
-
-        let notify = item("Notify When a Device Connects", enabled: isApp) {
-            defaults.set(!defaults.bool(forKey: "notifyOnConnect"), forKey: "notifyOnConnect")
-        }
-        notify.state = defaults.bool(forKey: "notifyOnConnect") ? .on : .off
-        submenu.addItem(notify)
-
-        let login = item("Open at Login", enabled: isApp) { [weak self] in self?.toggleLoginItem() }
-        login.state = isApp && SMAppService.mainApp.status == .enabled ? .on : .off
-        if !isApp { login.toolTip = "Available in Tactile.app" }
-        submenu.addItem(login)
-
-        if isApp {
-            submenu.addItem(.separator())
-            submenu.addItem(item("Show Log") {
-                let log = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
-                    .appendingPathComponent("Logs/Tactile.log")
-                NSWorkspace.shared.open(log)
-            })
-        }
-
-        let parent = NSMenuItem(title: "Settings", action: nil, keyEquivalent: "")
-        parent.submenu = submenu
-        return parent
-    }
-
-    // MARK: Actions
-
-    private func showPairing() {
-        guard let state else { return }
-        pairingWindow.show(state)
-    }
-
-    private func confirmRevoke(_ device: Pairing.Device) {
-        let alert = NSAlert()
-        alert.messageText = "Revoke \(device.name)?"
-        alert.informativeText = "It's disconnected right away and needs a new pairing code to connect again."
-        let revoke = alert.addButton(withTitle: "Revoke")
-        revoke.hasDestructiveAction = true
-        alert.addButton(withTitle: "Cancel")
-        NSApp.activate()
-        if alert.runModal() == .alertFirstButtonReturn { service.revoke(device.id) }
-    }
-
-    private func confirmRevokeAll() {
-        let alert = NSAlert()
-        alert.messageText = "Revoke all paired devices?"
-        alert.informativeText = "Every iPad is disconnected and needs a new pairing code to connect again."
-        let revoke = alert.addButton(withTitle: "Revoke All")
-        revoke.hasDestructiveAction = true
-        alert.addButton(withTitle: "Cancel")
-        NSApp.activate()
-        if alert.runModal() == .alertFirstButtonReturn { service.revokeAll() }
-    }
-
-    private func toggleLoginItem() {
+    private func setLoginItem(_ on: Bool) {
         let login = SMAppService.mainApp
         do {
-            if login.status == .enabled {
-                try login.unregister()
-            } else {
+            if on {
                 try login.register()
                 if login.status == .requiresApproval { SMAppService.openSystemSettingsLoginItems() }
+            } else {
+                try login.unregister()
             }
         } catch {
+            panel.dismiss()
             let alert = NSAlert(error: error)
             alert.informativeText = "Move Tactile.app to the Applications folder, then try again."
             NSApp.activate()
             alert.runModal()
         }
+        model.openAtLogin = login.status == .enabled
     }
+
+    // MARK: Events
 
     private func handle(_ event: TactileService.Event) {
         switch event {
@@ -249,58 +224,129 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             notifier?.post(title: "New device paired",
                            body: "\(device.name) can now type and move the pointer on this Mac. If this wasn't you, revoke it from the Tactile menu.")
         case .connected(let device):
-            if UserDefaults.standard.bool(forKey: "notifyOnConnect") {
+            if defaults.bool(forKey: "notifyOnConnect") {
                 notifier?.post(title: "\(device.name) connected", body: "It can now type and move the pointer on this Mac.")
             }
         case .started, .newCode:
             break
         }
     }
+}
 
-    // MARK: Helpers
+/// The borderless, frosted panel under the menu bar icon. It closes when you
+/// click elsewhere or press Esc, and grows or shrinks with its content.
+final class StatusPanel: NSPanel {
+    /// ⌘-key shortcuts while the panel is open, keyed by character.
+    var shortcuts: [String: () -> Void] = [:]
 
-    private static func copy(_ text: String) {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
+    private let model: PanelModel
+    private var monitors: [Any] = []
+    private var onClose: (() -> Void)?
+    private var top: CGFloat = 0
+    /// The menu bar icon's window; clicks there toggle the panel themselves.
+    private weak var buttonWindow: NSWindow?
+
+    init(model: PanelModel) {
+        self.model = model
+        super.init(contentRect: NSRect(x: 0, y: 0, width: 330, height: 400),
+                   styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: true)
+        isFloatingPanel = true
+        level = .popUpMenu
+        backgroundColor = .clear
+        isOpaque = false
+        hasShadow = true
+        acceptsMouseMovedEvents = true
+        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+
+        let material = NSVisualEffectView()
+        material.material = .menu
+        material.state = .active
+        material.blendingMode = .behindWindow
+        material.wantsLayer = true
+        material.layer?.cornerRadius = 12
+        material.layer?.cornerCurve = .continuous
+        material.layer?.masksToBounds = true
+
+        let hosting = ResizingHostingView(rootView: MenuPanelView(model: model))
+        hosting.onResize = { [weak self] in self?.fitToContent() }
+        hosting.translatesAutoresizingMaskIntoConstraints = false
+        material.addSubview(hosting)
+        NSLayoutConstraint.activate([
+            hosting.leadingAnchor.constraint(equalTo: material.leadingAnchor),
+            hosting.trailingAnchor.constraint(equalTo: material.trailingAnchor),
+            hosting.topAnchor.constraint(equalTo: material.topAnchor),
+            hosting.bottomAnchor.constraint(equalTo: material.bottomAnchor),
+        ])
+        contentView = material
     }
 
-    private func header(_ title: String) -> NSMenuItem {
-        let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
-        item.attributedTitle = NSAttributedString(string: title, attributes: [.font: NSFont.menuFont(ofSize: 0).bold])
-        item.isEnabled = false
-        return item
+    override var canBecomeKey: Bool { true }
+
+    func show(below button: NSStatusBarButton, onClose: @escaping () -> Void) {
+        guard let anchor = button.window?.frame else { return }
+        self.onClose = onClose
+        buttonWindow = button.window
+        let size = contentView?.fittingSize ?? frame.size
+        let screen = button.window?.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? .zero
+        let x = min(max(anchor.minX - 8, screen.minX + 6), screen.maxX - size.width - 6)
+        top = anchor.minY - 4
+        setFrame(NSRect(x: x, y: top - size.height, width: size.width, height: size.height), display: true)
+        makeKeyAndOrderFront(nil)
+        watchForDismissal()
     }
 
-    private func note(_ title: String) -> NSMenuItem {
-        let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
-        item.isEnabled = false
-        item.indentationLevel = 1
-        return item
+    func dismiss() {
+        guard isVisible else { return }
+        orderOut(nil)
+        monitors.forEach(NSEvent.removeMonitor)
+        monitors = []
+        onClose?()
+        onClose = nil
     }
 
-    private func item(_ title: String, key: String = "", enabled: Bool = true, action: @escaping () -> Void) -> NSMenuItem {
-        let item = ClosureMenuItem(title: title, keyEquivalent: key, action: action)
-        item.isEnabled = enabled
-        return item
+    /// Keeps the top edge under the menu bar as the content changes height.
+    private func fitToContent() {
+        guard let size = contentView?.fittingSize, isVisible else { return }
+        setFrame(NSRect(x: frame.minX, y: top - size.height, width: size.width, height: size.height), display: true)
+    }
+
+    private func watchForDismissal() {
+        // Clicks in other apps, or in Tactile's other windows.
+        monitors.append(NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+            self?.dismiss()
+        } as Any)
+        monitors.append(NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            guard let self else { return event }
+            if event.window !== self, event.window !== buttonWindow { dismiss() }
+            return event
+        } as Any)
+        // Esc closes; ⌘-shortcuts work while the panel is open; holding ⌥
+        // shows the details section, like the Wi-Fi menu.
+        monitors.append(NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { [weak self] event in
+            guard let self else { return event }
+            if event.type == .flagsChanged {
+                model.showDetails = event.modifierFlags.contains(.option)
+                return event
+            }
+            if event.keyCode == UInt16(kVK_Escape) {
+                dismiss()
+                return nil
+            }
+            if event.modifierFlags.contains(.command), let key = event.charactersIgnoringModifiers, let action = shortcuts[key] {
+                action()
+                return nil
+            }
+            return event
+        } as Any)
     }
 }
 
-/// A menu item that runs a closure.
-private final class ClosureMenuItem: NSMenuItem {
-    private let handler: () -> Void
+/// Tells the panel when SwiftUI content changes size.
+private final class ResizingHostingView<Content: View>: NSHostingView<Content> {
+    var onResize: (() -> Void)?
 
-    init(title: String, keyEquivalent: String, action: @escaping () -> Void) {
-        handler = action
-        super.init(title: title, action: #selector(run), keyEquivalent: keyEquivalent)
-        target = self
+    override func invalidateIntrinsicContentSize() {
+        super.invalidateIntrinsicContentSize()
+        DispatchQueue.main.async { [weak self] in self?.onResize?() }
     }
-
-    @available(*, unavailable)
-    required init(coder: NSCoder) { fatalError("init(coder:) is not supported") }
-
-    @objc private func run() { handler() }
-}
-
-private extension NSFont {
-    var bold: NSFont { NSFontManager.shared.convert(self, toHaveTrait: .boldFontMask) }
 }

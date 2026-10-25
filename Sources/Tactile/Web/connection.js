@@ -18,6 +18,7 @@ export class Connection extends EventTarget {
   #socket = null;
   #url = null;
   #retry = 500;
+  #held = false;
   state = 'connecting';
   macName = '';
 
@@ -99,7 +100,7 @@ export class Connection extends EventTarget {
   }
 
   #open() {
-    this.#setState('connecting');
+    if (!this.#held) this.#setState('connecting');
     const socket = new WebSocket(this.#url);
     this.#socket = socket;
 
@@ -113,7 +114,15 @@ export class Connection extends EventTarget {
       try { message = JSON.parse(event.data); } catch { return; }
       if (message.t === 'pong') {
         this.#lastPong = performance.now();
+      } else if (message.t === 'probe') {
+        // The Mac times this round trip to show connection quality.
+        this.#raw({ t: 'probe', n: message.n });
+      } else if (message.t === 'denied' && message.reason === 'held') {
+        // Disconnected from the Mac's menu: wait quietly until it's allowed again.
+        this.#held = true;
+        this.#setState('held');
       } else if (message.t === 'ready') {
+        this.#held = false;
         if (message.token) storage.set(TOKEN_KEY, message.token);
         this.macName = message.name || 'Mac';
         this.#setState('ready');
@@ -127,6 +136,10 @@ export class Connection extends EventTarget {
 
     socket.onclose = () => {
       if (this.#socket !== socket) return;
+      if (this.#held) {
+        setTimeout(() => this.#open(), 10000);
+        return;
+      }
       this.#setState('offline');
       setTimeout(() => this.#open(), this.#retry);
       this.#retry = Math.min(this.#retry * 2, 5000);

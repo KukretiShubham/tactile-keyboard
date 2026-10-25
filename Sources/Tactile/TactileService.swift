@@ -6,7 +6,10 @@ import Foundation
 final class TactileService {
     struct Snapshot {
         var running: Bool
+        /// Paused from the menu or the shortcut.
         var paused: Bool
+        /// Paused because the Mac is locked (and that option is on).
+        var lockPaused: Bool
         var dryRun: Bool
         var usesTailscale: Bool
         var code: String
@@ -17,6 +20,15 @@ final class TactileService {
         var fingerprint: String
         var devices: [Pairing.Device]
         var connected: Set<String>
+        /// Devices disconnected from the menu, kept off until reconnected.
+        var held: Set<String>
+        /// Round-trip time to each connected device, in milliseconds.
+        var latency: [String: Int]
+        /// When each device last sent input.
+        var lastInput: [String: Date]
+        var tailscaleExpiry: Date?
+        var portsSummary: String
+        var setupHost: String
     }
 
     enum Event {
@@ -39,6 +51,12 @@ final class TactileService {
     private var sockets: [SocketServer] = []
     private var running = false
     private var paused = false
+    private var lockPaused = false
+    private var held: Set<String> = []
+    private var latency: [String: Int] = [:]
+    private var lastInput: [String: Date] = [:]
+    private var lastActivityPublish = Date.distantPast
+    private var tailscaleExpiry: Date?
     private var lastActive: [String: Date] = [:]
 
     private var stateObservers: [(Snapshot) -> Void] = []
@@ -86,9 +104,13 @@ final class TactileService {
         let hosts = [HostInfo.bonjourName].compactMap { $0 } + HostInfo.ipv4Addresses
         let setupURLs = hosts.map { "http://\($0):\(setupPort)" }
         let host = hosts.first ?? "localhost"
+        let connected = Set(sockets.flatMap(\.connectedDeviceIDs))
+        var ports = "\(localPorts.app)–\(localPorts.socket)"
+        if tailscaleURL != nil { ports += " · Tailscale \(tailscalePorts.app)–\(tailscalePorts.socket)" }
         return Snapshot(
             running: running,
             paused: paused,
+            lockPaused: lockPaused,
             dryRun: dryRun,
             usesTailscale: useTailscale,
             code: pairing.code,
@@ -98,7 +120,13 @@ final class TactileService {
             tailscaleURL: running ? tailscaleURL : nil,
             fingerprint: local?.fingerprint ?? "",
             devices: pairing.devices.sorted { $0.lastSeen > $1.lastSeen },
-            connected: Set(sockets.flatMap(\.connectedDeviceIDs))
+            connected: connected,
+            held: held,
+            latency: latency.filter { connected.contains($0.key) },
+            lastInput: lastInput,
+            tailscaleExpiry: running ? tailscaleExpiry : nil,
+            portsSummary: ports,
+            setupHost: "\(host):\(setupPort)"
         )
     }
 
@@ -115,6 +143,35 @@ final class TactileService {
             self.paused = value
             if value { self.sockets.forEach { $0.releaseAllInput() } }
             Log.info(value ? "Input paused." : "Input resumed.")
+            self.publish()
+        }
+    }
+
+    /// Pauses input while the Mac is locked, separately from the manual pause.
+    func setLockPaused(_ value: Bool) {
+        queue.async {
+            guard self.lockPaused != value else { return }
+            self.lockPaused = value
+            if value { self.sockets.forEach { $0.releaseAllInput() } }
+            Log.info(value ? "Input paused while the Mac is locked." : "Mac unlocked; input resumed.")
+            self.publish()
+        }
+    }
+
+    /// Disconnects a device and keeps it off (it would otherwise reconnect
+    /// straight away) until `reconnect` or the next start.
+    func disconnect(_ id: String) {
+        queue.async {
+            self.held.insert(id)
+            self.sockets.forEach { $0.disconnect(deviceID: id) }
+            Log.info("Disconnected a device until it's reconnected from the menu.")
+            self.publish()
+        }
+    }
+
+    func reconnect(_ id: String) {
+        queue.async {
+            self.held.remove(id)
             self.publish()
         }
     }
@@ -155,6 +212,7 @@ final class TactileService {
             self.local = local
             let tailscale = useTailscale ? Tailscale.certificate() : nil
             HostInfo.tailscaleName = tailscale?.host
+            tailscaleExpiry = tailscale?.expires
             tailscaleURL = tailscale.map { "https://\($0.host):\(tailscalePorts.app)/" }
 
             pages = [try setupServer(local: local)]
@@ -184,6 +242,8 @@ final class TactileService {
         pages = []
         running = false
         paused = false
+        held = []
+        latency = [:]
         Log.info("Tactile stopped.")
         publish()
     }
@@ -216,10 +276,27 @@ final class TactileService {
                                       loopbackOnly: loopbackOnly, route: route, pairing: pairing, queue: queue) {
             dryRun ? LoggingInput() as InputTarget : InputSession()
         }
-        socket.isPaused = { [weak self] in self?.paused ?? false }
+        socket.isPaused = { [weak self] in (self?.paused ?? false) || (self?.lockPaused ?? false) }
+        socket.isHeld = { [weak self] id in self?.held.contains(id) ?? false }
+        socket.onInput = { [weak self] id in self?.inputArrived(from: id) }
+        socket.onLatency = { [weak self] id, ms in
+            self?.latency[id] = ms
+            self?.publish()
+        }
         socket.onChange = { [weak self] in self?.connectionsChanged() }
         socket.onConnect = { [weak self] device, isNew in self?.connected(device, isNew: isNew) }
         sockets.append(socket)
+    }
+
+    /// Marks a device as typing; the menu shows "input flowing" for a moment.
+    /// Published at most twice a second, however fast the input arrives.
+    private func inputArrived(from id: String) {
+        let now = Date()
+        lastInput[id] = now
+        if now.timeIntervalSince(lastActivityPublish) > 0.5 {
+            lastActivityPublish = now
+            publish()
+        }
     }
 
     private var connectedBefore: Set<String> = []

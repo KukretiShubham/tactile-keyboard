@@ -94,7 +94,12 @@ applySkin();
 fit();
 
 // Connection status
-const LABELS = { connecting: 'Connecting…', pairing: 'Waiting to pair', offline: 'Mac not reachable — retrying' };
+const LABELS = {
+  connecting: 'Connecting…',
+  pairing: 'Waiting to pair',
+  offline: 'Mac not reachable — retrying',
+  held: 'Disconnected by your Mac',
+};
 connection.addEventListener('state', ({ detail: state }) => {
   status.dataset.state = state;
   statusLabel.textContent = state === 'ready' ? connection.macName : LABELS[state];

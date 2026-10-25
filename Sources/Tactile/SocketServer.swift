@@ -30,7 +30,10 @@ final class SocketServer {
         var x: Double?
         var y: Double?
         var r: Bool?
+        var n: String?
     }
+
+    private static let inputTypes: Set = ["kd", "ku", "mv", "md", "mu", "sc", "sys", "txt"]
 
     /// Shown next to device names, e.g. "iPad · Tailscale".
     let route: String
@@ -40,6 +43,14 @@ final class SocketServer {
     var onConnect: ((Pairing.Device, _ isNew: Bool) -> Void)?
     /// Connected devices changed.
     var onChange: (() -> Void)?
+    /// A device disconnected from the menu; it's refused until reconnected.
+    var isHeld: (String) -> Bool = { _ in false }
+    /// A device sent input (used to show "input flowing").
+    var onInput: ((String) -> Void)?
+    /// A device's measured round-trip time, in milliseconds.
+    var onLatency: ((String, Int) -> Void)?
+
+    private var probeTimer: DispatchSourceTimer?
 
     private let listener: NWListener
     private let queue: DispatchQueue
@@ -87,11 +98,29 @@ final class SocketServer {
             if case .failed(let error) = state { Fatal.report("The secure connection couldn't start: \(error)") }
         }
         listener.start(queue: queue)
+
+        // Every few seconds, time a round trip to each device for the menu's
+        // connection quality. The page echoes the timestamp straight back.
+        let timer = DispatchSource.makeTimerSource(queue: queue)
+        timer.schedule(deadline: .now() + 1, repeating: 3)
+        timer.setEventHandler { [weak self] in
+            guard let self else { return }
+            let now = String(Self.uptimeMilliseconds)
+            for client in clients.values where client.deviceID != nil {
+                reply(client, ["t": "probe", "n": now])
+            }
+        }
+        timer.resume()
+        probeTimer = timer
     }
+
+    private static var uptimeMilliseconds: Int { Int(ProcessInfo.processInfo.systemUptime * 1000) }
 
     /// Stops listening and lets go of everything every iPad is holding.
     /// Call on the server queue.
     func stop() {
+        probeTimer?.cancel()
+        probeTimer = nil
         listener.cancel()
         let all = clients.values
         clients.removeAll()
@@ -189,6 +218,10 @@ final class SocketServer {
         let input = client.input
         switch message.t {
         case "ping": reply(client, ["t": "pong"])
+        case "probe":
+            if let sent = message.n.flatMap(Int.init) {
+                onLatency?(deviceID, max(0, Self.uptimeMilliseconds - sent))
+            }
         case "rel": input.releaseAll()
         case _ where isPaused(): break
         case "kd": if let key = message.k { input.keyDown(key, isRepeat: message.r ?? false) }
@@ -201,6 +234,7 @@ final class SocketServer {
         case "txt": if let text = message.s, text.count <= 4000 { input.type(text) }
         default: break
         }
+        if Self.inputTypes.contains(message.t) && !isPaused() { onInput?(deviceID) }
     }
 
     private func authenticate(_ message: Message, _ client: Client) {
@@ -210,8 +244,14 @@ final class SocketServer {
         switch message.t {
         case "hello":
             if let token = message.token, let device = pairing.device(forToken: token) {
+                if isHeld(device.id) {
+                    reply(client, ["t": "denied", "reason": "held"])
+                    client.connection.cancel()
+                    return
+                }
                 pairing.nameIfUnnamed(device.id, as: "\(Self.deviceName(message.name)) · \(route)")
-                grant(client, device: device, token: nil)
+                let named = pairing.devices.first { $0.id == device.id } ?? device
+                grant(client, device: named, token: nil)
             } else {
                 reply(client, ["t": "pair"])
             }

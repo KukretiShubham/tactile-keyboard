@@ -20,14 +20,20 @@ Developers can still run it in Terminal with `swift run -c release Tactile`, whi
 
 ### The menu bar
 
-Click the Tactile icon in the menu bar. Hover over it to see the status. The icon itself shows the state at a glance: a filled keyboard when a device is connected, a pause icon when input is paused, and a warning when Accessibility access is missing.
+Click the Tactile icon in the menu bar to open its panel (styled like the Wi-Fi menu; click elsewhere or press Esc to close). Hover over the icon to see the status. The icon itself shows the state at a glance: a filled keyboard when a device is connected, a pause icon when input is paused, and a warning when Accessibility access is missing.
 
-- **Status**: running, paused or stopped, and which devices are connected right now.
-- **Show Pairing Code…** (⌘P): a window with the QR code to scan, the code to type, and the addresses to open.
-- **Pause Input** (⌘.): devices stay connected, but nothing they send reaches the Mac.
-- **Stop / Start Tactile**: turns Tactile's network access off or on entirely.
-- **Paired Devices**: every paired device and when it was last used. Choose one to revoke it (it's disconnected immediately), or **Revoke All**.
-- **Settings**: Use Tailscale, Notify When a Device Connects, Open at Login, Show Log.
+- **Header:** the status ("Connected · input flowing" while you type) and an on/off switch for Tactile itself.
+- **Devices:** a card for each paired device with its route (Tailscale or Wi-Fi). Connected devices also show connection quality, for example "Excellent · 14 ms" with signal bars. Hover over a card to:
+  - **Disconnect** it: it stays off until you choose **Reconnect**, because an iPad would otherwise reconnect straight away.
+  - **Revoke** it: click once more to confirm.
+- **Options:**
+  - **Pause Input** (also **⌃⌥⌘P** from any app)
+  - **Pause While Mac Is Locked**: also pauses during the screen saver
+  - **Use Tailscale**
+  - **Notify When a Device Connects**
+  - **Open at Login**
+- **Pair a Device…** (⌘P) opens the QR code window. **Copy Tailscale Link** copies the address.
+- **Hold ⌥** while opening the panel (or while it's open) to see details: setup address, ports, certificate fingerprint, Tailscale certificate expiry, and Show Log.
 
 Tactile sends a macOS notification when a new device pairs, and when a device connects after being away for a while.
 

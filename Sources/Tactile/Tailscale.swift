@@ -1,4 +1,5 @@
 import Foundation
+import Security
 
 /// Gets a publicly trusted HTTPS certificate (Let's Encrypt, via Tailscale) for
 /// this Mac's tailnet name. iPads running Tailscale can then open Tactile with
@@ -7,6 +8,7 @@ enum Tailscale {
     struct Certificate {
         let identity: TLSIdentity
         let host: String
+        let expires: Date?
     }
 
     private static let candidates = [
@@ -60,11 +62,22 @@ enum Tailscale {
             try certificates.joined(separator: "\n").write(to: certURL, atomically: true, encoding: .utf8)
             try key.write(to: keyURL, atomically: true, encoding: .utf8)
             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: keyURL.path)
-            return Certificate(identity: try TLSIdentity.load(certificate: certURL, key: keyURL), host: host)
+            return Certificate(identity: try TLSIdentity.load(certificate: certURL, key: keyURL), host: host,
+                               expires: expiry(ofPEM: certificates[0]))
         } catch {
             Log.warn("Couldn't use the Tailscale certificate (\(error)); using the local certificate only.")
             return nil
         }
+    }
+
+    /// When a PEM certificate stops being valid.
+    private static func expiry(ofPEM pem: String) -> Date? {
+        guard let der = try? OpenSSL.derFromPEM(Data(pem.utf8)),
+              let certificate = SecCertificateCreateWithData(nil, der as CFData),
+              let values = SecCertificateCopyValues(certificate, [kSecOIDX509V1ValidityNotAfter] as CFArray, nil) as? [CFString: Any],
+              let entry = values[kSecOIDX509V1ValidityNotAfter] as? [CFString: Any],
+              let seconds = entry[kSecPropertyKeyValue] as? NSNumber else { return nil }
+        return Date(timeIntervalSinceReferenceDate: seconds.doubleValue)
     }
 
     /// Splits PEM output into certificate blocks and the private key block.
