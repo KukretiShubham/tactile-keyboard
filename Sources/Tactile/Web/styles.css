@@ -256,6 +256,55 @@ html { touch-action: none; }
 [data-layout="both"][data-position="bottom"] .deck { order: 2; }
 [data-layout="keyboard"][data-position="middle"] .stage { justify-content: center; }
 [data-layout="keyboard"][data-position="bottom"] .stage { justify-content: flex-end; }
+/* Floating keyboard: placed by app.js, moved by its handle, resized by its grip. */
+[data-size="floating"] .stage { position: relative; display: block; }
+[data-size="floating"] .deck { position: absolute; }
+.deck.adjusting {
+  box-shadow: var(--deck-shadow), 0 0 0 2px var(--accent);
+  transition: none;
+}
+[data-skin="midnight"] .deck.adjusting { box-shadow: var(--deck-shadow), 0 0 0 2px var(--glow); }
+
+.float-handle, .float-grip { display: none; }
+
+/* The pill is small, like the iPad's, but the touch area is 44 pt tall. */
+[data-size="floating"] .float-handle {
+  position: absolute;
+  left: 50%;
+  bottom: -38px;
+  width: 140px;
+  height: 44px;
+  transform: translateX(-50%);
+  display: grid;
+  place-items: center;
+  cursor: grab;
+  touch-action: none;
+}
+.float-handle span {
+  width: 64px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--legend-2);
+  opacity: 0.55;
+  transition: opacity 150ms ease, width 150ms var(--ease);
+}
+.deck.adjusting .float-handle span { opacity: 0.9; width: 76px; }
+
+[data-size="floating"] .float-grip {
+  position: absolute;
+  right: -14px;
+  bottom: -14px;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  color: var(--legend-2);
+  opacity: 0.7;
+  cursor: nwse-resize;
+  touch-action: none;
+}
+.float-grip svg { width: 20px; height: 20px; display: block; }
+
 [data-layout="keyboard"] .trackpad,
 [data-layout="trackpad"] .deck { display: none; }
 

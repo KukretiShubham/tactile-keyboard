@@ -88,7 +88,9 @@ Other settings (gear button, top right):
 - **Pairing:** scanning the QR code in Terminal also pairs the iPad, so there's no code to type. Each code works once; Terminal shows a new QR and code after every pairing.
 - **Rest Fingers on Keys** (on by default): keys type when you lift your finger, so fingers resting on the keys don't type. If you roll from one key to the next, the letters still come out in the order you pressed them. Delete and the arrow keys still repeat when held.
 - **Keyboard Position:** Top or Bottom with the trackpad (Bottom docks the keys like the iPad's own keyboard). In keyboard-only layout, Middle is also available.
-- **Keyboard Size:** in keyboard-only layout, **Expanded** makes the keys taller to fill the screen.
+- **Keyboard Size** (keyboard-only layout):
+  - **Expanded** makes the keys taller to fill the screen.
+  - **Floating** works like the iPad's floating keyboard. Drag the handle under it to move it; it snaps to the centre and to the top and bottom edges. Drag the corner grip to resize it, down to keys of about 40 pt. Double-tap the handle to reset. The size and position are remembered separately for portrait and landscape. Only the handle and grip move it, so typing never does.
 - **Keep Screen Awake** (on by default): the iPad doesn't dim or sleep while Tactile is open.
 - **Key Popups** (on by default): letters and symbols appear in a bubble above your finger, like the iPhone keyboard.
 - **Key sounds:** each click comes from the side of the keyboard the key is on, and Crisp and Thock add a softer second click when the key comes back up. Safari only allows sound after a tap, so the first keystroke turns sound on. If it hasn't, a "Tap to enable key sounds" button appears at the top. **Test Sound** in Settings plays a sample. **Sound in Silent Mode** plays sounds even when the iPad is muted, but pauses any music playing on the iPad.

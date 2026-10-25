@@ -124,7 +124,8 @@ export function setupSheets({ connection, feedback }) {
 
     // Only offer what applies to the current layout.
     const layout = settings.get('layout');
-    document.getElementById('positionRow').hidden = layout === 'trackpad';
+    const floats = layout === 'keyboard' && settings.get('keyboardSize') === 'floating';
+    document.getElementById('positionRow').hidden = layout === 'trackpad' || floats;
     document.getElementById('sizeRow').hidden = layout !== 'keyboard';
     document.getElementById('sizeNote').hidden = layout !== 'keyboard';
     settingsSheet.querySelector('[data-setting="keyboardPosition"] [data-value="middle"]').hidden = layout !== 'keyboard';

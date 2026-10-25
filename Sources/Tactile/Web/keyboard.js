@@ -332,6 +332,8 @@ export function createKeyboard(root, { send, feedback, settings }) {
   }
 
   root.addEventListener('pointerdown', (event) => {
+    // The floating keyboard's handle and grip move it; they never type.
+    if (event.target.closest('.float-handle, .float-grip')) return;
     const el = keyAt(event);
     if (!el) return;
     event.preventDefault();

@@ -17,6 +17,7 @@ const DEFAULTS = {
   functionRow: true,
   keyboardPosition: 'top',
   keyboardSize: 'fit',
+  floatingFrame: null,
   restFingers: true,
   keyPopups: true,
   keepAwake: true,
