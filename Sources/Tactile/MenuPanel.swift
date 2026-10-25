@@ -19,6 +19,7 @@ final class PanelModel: ObservableObject {
         var setPaused: (Bool) -> Void = { _ in }
         var setPauseWhenLocked: (Bool) -> Void = { _ in }
         var setUseTailscale: (Bool) -> Void = { _ in }
+        var setOnlyMyDevices: (Bool) -> Void = { _ in }
         var setNotify: (Bool) -> Void = { _ in }
         var setOpenAtLogin: (Bool) -> Void = { _ in }
         var disconnect: (String) -> Void = { _ in }
@@ -161,6 +162,10 @@ struct MenuPanelView: View {
             }
             SwitchRow(symbol: "point.3.connected.trianglepath.dotted", title: "Use Tailscale",
                       isOn: state?.usesTailscale == true) { model.actions.setUseTailscale(!(state?.usesTailscale ?? false)) }
+            if state?.usesTailscale == true {
+                SwitchRow(symbol: "person.badge.shield.checkmark", title: "Only My Devices on Tailscale",
+                          isOn: state?.onlyMyDevices == true) { model.actions.setOnlyMyDevices(!(state?.onlyMyDevices ?? true)) }
+            }
             SwitchRow(symbol: "bell", title: "Notify When a Device Connects", isOn: model.notifyOnConnect) {
                 model.actions.setNotify(!model.notifyOnConnect)
             }

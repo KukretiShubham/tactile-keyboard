@@ -98,6 +98,10 @@ final class MenuBarController: NSObject {
                 self?.defaults.set(on, forKey: "useTailscale")
                 self?.service.setUseTailscale(on)
             },
+            setOnlyMyDevices: { [weak self] on in
+                self?.defaults.set(on, forKey: "onlyMyTailscaleDevices")
+                self?.service.setOnlyMyDevices(on)
+            },
             setNotify: { [weak self] on in
                 self?.defaults.set(on, forKey: "notifyOnConnect")
                 self?.model.notifyOnConnect = on

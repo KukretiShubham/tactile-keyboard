@@ -149,6 +149,7 @@ const LABELS = {
   pairing: 'Waiting to pair',
   offline: 'Mac not reachable — retrying',
   held: 'Disconnected by your Mac',
+  refused: 'Not allowed: sign in to Tailscale as the Mac’s owner',
 };
 connection.addEventListener('state', ({ detail: state }) => {
   status.dataset.state = state;

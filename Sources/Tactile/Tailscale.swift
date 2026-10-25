@@ -9,6 +9,16 @@ enum Tailscale {
         let identity: TLSIdentity
         let host: String
         let expires: Date?
+        /// The Tailscale user this Mac is signed in as.
+        let ownerID: Int64?
+    }
+
+    /// Who a tailnet address belongs to, according to Tailscale.
+    struct Peer {
+        let userID: Int64
+        let tagged: Bool
+        /// Friendly device name, e.g. "iPad Air 13".
+        let deviceName: String
     }
 
     private static let candidates = [
@@ -34,6 +44,7 @@ enum Tailscale {
             return nil
         }
         let host = dnsName.hasSuffix(".") ? String(dnsName.dropLast()) : dnsName
+        let ownerID = (me["UserID"] as? NSNumber)?.int64Value
         guard (status["CertDomains"] as? [String])?.contains(host) == true else {
             Log.warn("""
             Tailscale is connected, but HTTPS certificates are off for your tailnet.
@@ -63,11 +74,39 @@ enum Tailscale {
             try key.write(to: keyURL, atomically: true, encoding: .utf8)
             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: keyURL.path)
             return Certificate(identity: try TLSIdentity.load(certificate: certURL, key: keyURL), host: host,
-                               expires: expiry(ofPEM: certificates[0]))
+                               expires: expiry(ofPEM: certificates[0]), ownerID: ownerID)
         } catch {
             Log.warn("Couldn't use the Tailscale certificate (\(error)); using the local certificate only.")
             return nil
         }
+    }
+
+    /// Asks Tailscale who owns a tailnet address. Nil when it can't say.
+    static func whois(_ address: String) -> Peer? {
+        guard let cli = candidates.first(where: FileManager.default.isExecutableFile(atPath:)),
+              let output = run(cli, ["whois", "--json", address], timeout: 3),
+              let info = try? JSONSerialization.jsonObject(with: output) as? [String: Any],
+              let node = info["Node"] as? [String: Any],
+              let userID = (node["User"] as? NSNumber)?.int64Value else { return nil }
+        let tags = node["Tags"] as? [String] ?? []
+        let computed = node["ComputedName"] as? String ?? ""
+        let hostname = (node["Hostinfo"] as? [String: Any])?["Hostname"] as? String ?? ""
+        // iPads and iPhones report "localhost" as their host name, so prefer
+        // the tailnet's name for the device.
+        let raw = !computed.isEmpty ? computed : hostname
+        return Peer(userID: userID, tagged: !tags.isEmpty, deviceName: friendlyName(raw))
+    }
+
+    /// "ipad-air-13" → "iPad Air 13".
+    static func friendlyName(_ raw: String) -> String {
+        let known = ["ipad": "iPad", "iphone": "iPhone", "macbook": "MacBook", "imac": "iMac",
+                     "mac": "Mac", "pro": "Pro", "air": "Air", "max": "Max", "mini": "mini", "plus": "Plus"]
+        let words = raw.split(whereSeparator: { $0 == "-" || $0 == "_" || $0 == " " }).map { word -> String in
+            let lower = word.lowercased()
+            return known[lower] ?? (word.first?.isLetter == true && word == word.lowercased() ? word.capitalized : String(word))
+        }
+        let name = words.joined(separator: " ")
+        return name.isEmpty ? "Tailscale device" : name
     }
 
     /// When a PEM certificate stops being valid.

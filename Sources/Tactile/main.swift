@@ -70,12 +70,13 @@ if !dryRun && !Accessibility.isTrusted(prompt: true) {
 }
 
 let preferences = UserDefaults.standard
-preferences.register(defaults: ["useTailscale": true, "notifyOnConnect": true])
+preferences.register(defaults: ["useTailscale": true, "notifyOnConnect": true, "onlyMyTailscaleDevices": true])
 let service = TactileService(
     webRoot: webRoot,
     setupPort: option("--port").flatMap(UInt16.init) ?? 8420,
     dryRun: dryRun,
-    useTailscale: !arguments.contains("--no-tailscale") && preferences.bool(forKey: "useTailscale")
+    useTailscale: !arguments.contains("--no-tailscale") && preferences.bool(forKey: "useTailscale"),
+    onlyMyDevices: preferences.bool(forKey: "onlyMyTailscaleDevices")
 )
 
 // In Terminal, show the QR code and pairing code whenever they change.

@@ -11,6 +11,8 @@ final class SocketServer {
         let input: InputTarget
         var deviceID: String?
         var authTimeout: DispatchWorkItem?
+        /// Who Tailscale says owns this device (Tailscale route only).
+        var peer: Tailscale.Peer?
 
         init(connection: NWConnection, address: String, input: InputTarget) {
             self.connection = connection
@@ -51,6 +53,9 @@ final class SocketServer {
     var onLatency: ((String, Int) -> Void)?
 
     private var probeTimer: DispatchSourceTimer?
+
+    /// Set on the Tailscale route: only the Mac owner's devices get in.
+    var gate: TailnetGate?
 
     private let listener: NWListener
     private let queue: DispatchQueue
@@ -163,7 +168,22 @@ final class SocketServer {
         }
         client.authTimeout = timeout
         queue.asyncAfter(deadline: .now() + 120, execute: timeout)
-        receive(client)
+
+        // Over Tailscale, nothing is read until Tailscale confirms the device
+        // is yours, so other people's devices never reach pairing.
+        guard let gate, gate.isEnabled() else { return receive(client) }
+        gate.check(client.address, on: queue) { [weak self, weak client] verdict in
+            guard let self, let client, clients[ObjectIdentifier(client)] != nil else { return }
+            switch verdict {
+            case .allowed(let peer):
+                client.peer = peer
+                receive(client)
+            case .refused(let reason):
+                Log.warn("Refused a Tailscale connection from \(client.address): \(reason).")
+                reply(client, ["t": "denied", "reason": "foreign"])
+                queue.asyncAfter(deadline: .now() + 0.5) { client.connection.cancel() }
+            }
+        }
     }
 
     private func drop(_ id: ObjectIdentifier) {
@@ -249,14 +269,15 @@ final class SocketServer {
                     client.connection.cancel()
                     return
                 }
-                pairing.nameIfUnnamed(device.id, as: "\(Self.deviceName(message.name)) · \(route)")
+                pairing.improveName(device.id, to: "\(client.peer?.deviceName ?? Self.deviceName(message.name)) · \(route)",
+                                    isRealName: client.peer != nil)
                 let named = pairing.devices.first { $0.id == device.id } ?? device
                 grant(client, device: named, token: nil)
             } else {
                 reply(client, ["t": "pair"])
             }
         case "pair":
-            let name = "\(Self.deviceName(message.name)) · \(route)"
+            let name = "\(client.peer?.deviceName ?? Self.deviceName(message.name)) · \(route)"
             if let code = message.code, let paired = pairing.redeem(code: code, from: client.address, name: name) {
                 Log.info("Paired \(name) at \(client.address)")
                 grant(client, device: paired.device, token: paired.token)

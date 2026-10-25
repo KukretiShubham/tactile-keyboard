@@ -1,22 +1,94 @@
-// Key sounds are synthesized with Web Audio (no audio files): a filtered noise
-// "click" for the switch plus a short pitched "body" for the keycap. iPads have
-// no vibration motor, so sound is the primary tactile cue; vibration is used
-// where the browser supports it.
+// Key sounds are synthesized with Web Audio (no audio files). A real keystroke
+// is mostly short noise, not a tone: a sharp tick as the switch actuates, a
+// brief resonance from the plastic keycap, and a dull, pitchless thud as the
+// key bottoms out. Each sound below is a few such layers of filtered noise
+// with fast-decaying envelopes. (A pitched tone that slides down is how drum
+// synths make a kick, which is what to avoid.) iPads have no vibration motor,
+// so sound is the primary tactile cue; vibration is used where supported.
 
+/**
+ * A layer is noise through one filter with a fast decay:
+ *   { filter: 'highpass' | 'bandpass' | 'lowpass', freq, q, gain, decay, delay? }
+ * `freq` scales with the key's pitch; `delay` (seconds) offsets the layer.
+ */
 const PROFILES = {
-  soft: { click: { freq: 2600, q: 0.9, decay: 0.022, gain: 0.55 }, body: { freq: 210, decay: 0.035, gain: 0.3 } },
-  crisp: { click: { freq: 4800, q: 1.6, decay: 0.014, gain: 0.65 }, body: { freq: 340, decay: 0.022, gain: 0.18 } },
-  thock: { click: { freq: 1300, q: 0.7, decay: 0.03, gain: 0.45 }, body: { freq: 120, decay: 0.07, gain: 0.6 } },
+  // Low-travel scissor keys, like a Magic Keyboard: a light tick and a muted body.
+  soft: [
+    { filter: 'highpass', freq: 2600, q: 0.7, gain: 0.55, decay: 0.004 },
+    { filter: 'bandpass', freq: 1900, q: 5, gain: 0.32, decay: 0.016 },
+    { filter: 'lowpass', freq: 520, q: 0.7, gain: 0.22, decay: 0.011 },
+  ],
+  // Clicky mechanical switch: a bright snap with a second click as it trips.
+  crisp: [
+    { filter: 'highpass', freq: 4200, q: 0.8, gain: 0.7, decay: 0.0025 },
+    { filter: 'bandpass', freq: 3500, q: 7, gain: 0.38, decay: 0.012 },
+    { filter: 'highpass', freq: 3200, q: 0.8, gain: 0.32, decay: 0.002, delay: 0.009 },
+    { filter: 'lowpass', freq: 700, q: 0.7, gain: 0.18, decay: 0.009 },
+  ],
+  // Deep, muted mechanical keyboard: soft attack, low keycap ring, round thud.
+  thock: [
+    { filter: 'highpass', freq: 1800, q: 0.7, gain: 0.25, decay: 0.003 },
+    { filter: 'bandpass', freq: 1050, q: 3.5, gain: 0.42, decay: 0.03 },
+    { filter: 'lowpass', freq: 330, q: 0.8, gain: 0.45, decay: 0.024 },
+  ],
 };
 
-// The softer second click a mechanical switch makes as the key comes back up.
+// The quieter sound of a key coming back up.
 const RELEASE = {
-  soft: { click: { freq: 3400, q: 1.2, decay: 0.01, gain: 0.12 } },
-  crisp: { click: { freq: 6200, q: 2, decay: 0.009, gain: 0.32 } },
-  thock: { click: { freq: 1900, q: 0.9, decay: 0.016, gain: 0.26 }, body: { freq: 180, decay: 0.02, gain: 0.15 } },
+  soft: [{ filter: 'highpass', freq: 3200, q: 0.7, gain: 0.14, decay: 0.003 }],
+  crisp: [
+    { filter: 'highpass', freq: 4600, q: 0.8, gain: 0.34, decay: 0.002 },
+    { filter: 'bandpass', freq: 3800, q: 6, gain: 0.16, decay: 0.008 },
+  ],
+  thock: [
+    { filter: 'bandpass', freq: 1400, q: 3, gain: 0.2, decay: 0.014 },
+    { filter: 'lowpass', freq: 450, q: 0.7, gain: 0.14, decay: 0.01 },
+  ],
 };
 
-const TRACKPAD_CLICK = { click: { freq: 1900, q: 1.3, decay: 0.012, gain: 0.5 }, body: { freq: 150, decay: 0.025, gain: 0.35 } };
+// A trackpad click, like a MacBook's: short, dry and dull, with no keycap ring.
+const TRACKPAD_CLICK = [
+  { filter: 'bandpass', freq: 1150, q: 1.4, gain: 0.55, decay: 0.006 },
+  { filter: 'highpass', freq: 4500, q: 0.7, gain: 0.2, decay: 0.0015 },
+  { filter: 'lowpass', freq: 260, q: 0.8, gain: 0.3, decay: 0.008 },
+];
+
+/**
+ * Plays `layers` into `destination` at time `t`. Exported so the same sounds
+ * can be rendered offline (for listening tests) as well as played live.
+ */
+export function voice(ctx, destination, noise, layers, t, pitch = 1) {
+  const jitter = 1 + (Math.random() - 0.5) * 0.08;
+  for (const layer of layers) {
+    const start = t + (layer.delay ?? 0);
+    const source = ctx.createBufferSource();
+    source.buffer = noise;
+    // Each key press uses a different stretch of noise, so repeats aren't identical.
+    const offset = Math.random() * Math.max(0, noise.duration - 0.06);
+    const filter = ctx.createBiquadFilter();
+    filter.type = layer.filter;
+    filter.frequency.value = layer.freq * pitch * jitter;
+    filter.Q.value = layer.q;
+    const envelope = ctx.createGain();
+    envelope.gain.setValueAtTime(0.0001, start);
+    envelope.gain.linearRampToValueAtTime(layer.gain, start + 0.0004);
+    envelope.gain.exponentialRampToValueAtTime(0.0001, start + 0.0004 + layer.decay * 2.5);
+    source.connect(filter).connect(envelope).connect(destination);
+    source.start(start, offset);
+    source.stop(start + layer.decay * 2.5 + 0.01);
+  }
+}
+
+/** One buffer of white noise that every layer draws from. */
+export function makeNoise(ctx) {
+  const length = Math.floor(ctx.sampleRate * 0.5);
+  const noise = ctx.createBuffer(1, length, ctx.sampleRate);
+  const samples = noise.getChannelData(0);
+  for (let i = 0; i < length; i++) samples[i] = Math.random() * 2 - 1;
+  return noise;
+}
+
+export const SOUNDS = { PROFILES, RELEASE, TRACKPAD_CLICK };
 
 // Bigger keys sound lower, like the stabilised keys on a real keyboard.
 const PITCH = { key: 1, mod: 1.1, wide: 0.86, space: 0.7 };
@@ -111,10 +183,7 @@ export class Feedback extends EventTarget {
     const out = ctx.createGain();
     out.connect(compressor).connect(ctx.destination);
 
-    const length = Math.floor(ctx.sampleRate * 0.12);
-    const noise = ctx.createBuffer(1, length, ctx.sampleRate);
-    const samples = noise.getChannelData(0);
-    for (let i = 0; i < length; i++) samples[i] = Math.random() * 2 - 1;
+    const noise = makeNoise(ctx);
 
     ctx.addEventListener('statechange', () => this.#announce());
     this.#ctx = ctx;
@@ -140,13 +209,10 @@ export class Feedback extends EventTarget {
     if (this.settings.get('vibration') && this.canVibrate) navigator.vibrate(ms);
   }
 
-  #play(profile, pitch, position = 0, delay = 0) {
+  #play(layers, pitch, position = 0, delay = 0) {
     const ctx = this.#ctx;
     const volume = this.settings.get('volume');
     if (!this.settings.get('sound') || !ctx || ctx.state !== 'running' || volume <= 0) return;
-
-    const t = ctx.currentTime + delay;
-    const jitter = 1 + (Math.random() - 0.5) * 0.1;
     this.#out.gain.setValueAtTime(volume * MAKEUP_GAIN, ctx.currentTime);
 
     // Place the sound left-to-right like the key on the keyboard.
@@ -157,31 +223,6 @@ export class Feedback extends EventTarget {
       pan.connect(this.#out);
       destination = pan;
     }
-
-    const { click, body } = profile;
-    const noise = ctx.createBufferSource();
-    noise.buffer = this.#noise;
-    const band = ctx.createBiquadFilter();
-    band.type = 'bandpass';
-    band.frequency.value = click.freq * pitch * jitter;
-    band.Q.value = click.q;
-    const clickGain = ctx.createGain();
-    clickGain.gain.setValueAtTime(click.gain, t);
-    clickGain.gain.exponentialRampToValueAtTime(0.0001, t + click.decay);
-    noise.connect(band).connect(clickGain).connect(destination);
-    noise.start(t);
-    noise.stop(t + click.decay + 0.02);
-
-    if (!body) return;
-    const tone = ctx.createOscillator();
-    tone.type = 'sine';
-    tone.frequency.setValueAtTime(body.freq * pitch * jitter, t);
-    tone.frequency.exponentialRampToValueAtTime(body.freq * pitch * 0.55, t + body.decay);
-    const toneGain = ctx.createGain();
-    toneGain.gain.setValueAtTime(body.gain, t);
-    toneGain.gain.exponentialRampToValueAtTime(0.0001, t + body.decay);
-    tone.connect(toneGain).connect(destination);
-    tone.start(t);
-    tone.stop(t + body.decay + 0.02);
+    voice(ctx, destination, this.#noise, layers, ctx.currentTime + delay, pitch);
   }
 }

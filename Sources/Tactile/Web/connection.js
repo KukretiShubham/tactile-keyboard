@@ -117,6 +117,10 @@ export class Connection extends EventTarget {
       } else if (message.t === 'probe') {
         // The Mac times this round trip to show connection quality.
         this.#raw({ t: 'probe', n: message.n });
+      } else if (message.t === 'denied' && message.reason === 'foreign') {
+        // Over Tailscale, only devices signed in as the Mac's owner may connect.
+        this.#held = true;
+        this.#setState('refused');
       } else if (message.t === 'denied' && message.reason === 'held') {
         // Disconnected from the Mac's menu: wait quietly until it's allowed again.
         this.#held = true;

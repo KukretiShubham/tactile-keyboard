@@ -161,9 +161,15 @@ final class Pairing {
     /// Name for devices paired before Tactile recorded names.
     static let unnamed = "Earlier pairing"
 
-    /// Gives an unnamed device the name its browser reports.
-    func nameIfUnnamed(_ id: String, as name: String) {
-        guard let index = devices.firstIndex(where: { $0.id == id }), devices[index].name == Self.unnamed else { return }
+    /// Gives a device a better name. Unnamed devices take any name; devices
+    /// named only by their type ("iPad · Tailscale") take a real device name,
+    /// such as the one Tailscale knows.
+    func improveName(_ id: String, to name: String, isRealName: Bool) {
+        guard let index = devices.firstIndex(where: { $0.id == id }), devices[index].name != name else { return }
+        let current = devices[index].name
+        let base = current.components(separatedBy: " · ").first ?? current
+        let byTypeOnly = ["iPad", "iPhone", "Mac", "Browser", "Android device"].contains(base)
+        guard current == Self.unnamed || (isRealName && byTypeOnly) else { return }
         devices[index].name = name
         save()
         onDevicesChanged?()

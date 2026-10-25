@@ -12,6 +12,8 @@ final class TactileService {
         var lockPaused: Bool
         var dryRun: Bool
         var usesTailscale: Bool
+        /// Over Tailscale, only devices signed in as this Mac's owner get in.
+        var onlyMyDevices: Bool
         var code: String
         var setupURLs: [String]
         var pairingLink: String
@@ -44,6 +46,7 @@ final class TactileService {
     private let dryRun: Bool
     private let setupPort: UInt16
     private var useTailscale: Bool
+    private var onlyMyDevices: Bool
 
     private var local: LocalAuthority?
     private var tailscaleURL: String?
@@ -67,11 +70,12 @@ final class TactileService {
     private var devPorts: (app: UInt16, socket: UInt16) { (setupPort + 5, setupPort + 6) }
     private let basePolicy = "default-src 'self'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'"
 
-    init(webRoot: URL, setupPort: UInt16, dryRun: Bool, useTailscale: Bool) {
+    init(webRoot: URL, setupPort: UInt16, dryRun: Bool, useTailscale: Bool, onlyMyDevices: Bool = true) {
         assets = HTTPServer.loadAssets(from: webRoot)
         self.setupPort = setupPort
         self.dryRun = dryRun
         self.useTailscale = useTailscale
+        self.onlyMyDevices = onlyMyDevices
         pairing.onNewCode = { [weak self] in
             self?.publish()
             self?.emit(.newCode)
@@ -113,6 +117,7 @@ final class TactileService {
             lockPaused: lockPaused,
             dryRun: dryRun,
             usesTailscale: useTailscale,
+            onlyMyDevices: onlyMyDevices,
             code: pairing.code,
             setupURLs: setupURLs,
             pairingLink: "\(setupURLs.first ?? "http://localhost:\(setupPort)")/#pair=\(pairing.code)",
@@ -176,6 +181,16 @@ final class TactileService {
         }
     }
 
+    /// Lets only the Mac owner's devices connect over Tailscale (checked when
+    /// each connection opens).
+    func setOnlyMyDevices(_ value: Bool) {
+        queue.async {
+            self.onlyMyDevices = value
+            Log.info(value ? "Only your own Tailscale devices can connect." : "Any device on the tailnet can try to pair.")
+            self.publish()
+        }
+    }
+
     func setUseTailscale(_ value: Bool) {
         queue.async {
             self.useTailscale = value
@@ -218,7 +233,11 @@ final class TactileService {
             pages = [try setupServer(local: local)]
             sockets = []
             try addApp(local.identity, ports: localPorts, route: "Wi-Fi")
-            if let tailscale { try addApp(tailscale.identity, ports: tailscalePorts, route: "Tailscale") }
+            if let tailscale {
+                let gate = TailnetGate(ownerID: tailscale.ownerID)
+                gate.isEnabled = { [weak self] in self?.onlyMyDevices ?? true }
+                try addApp(tailscale.identity, ports: tailscalePorts, route: "Tailscale", gate: gate)
+            }
             // Lets a browser on this Mac try the UI without trusting the
             // certificate. Input is only logged in a dry run.
             if dryRun { try addApp(nil, ports: devPorts, route: "Dry run") }
@@ -263,7 +282,8 @@ final class TactileService {
 
     /// The keyboard page and its socket, served with one certificate. Without a
     /// certificate (dry-run development copy only) both listen on 127.0.0.1 alone.
-    private func addApp(_ identity: TLSIdentity?, ports: (app: UInt16, socket: UInt16), route: String) throws {
+    private func addApp(_ identity: TLSIdentity?, ports: (app: UInt16, socket: UInt16), route: String,
+                        gate: TailnetGate? = nil) throws {
         var pageAssets = assets.filter { !$0.key.hasPrefix("/setup/") }
         pageAssets["/config.json"] = HTTPServer.json(["socketPort": Int(ports.socket)])
         let loopbackOnly = identity == nil
@@ -279,6 +299,7 @@ final class TactileService {
         socket.isPaused = { [weak self] in (self?.paused ?? false) || (self?.lockPaused ?? false) }
         socket.isHeld = { [weak self] id in self?.held.contains(id) ?? false }
         socket.onInput = { [weak self] id in self?.inputArrived(from: id) }
+        socket.gate = gate
         socket.onLatency = { [weak self] id, ms in
             self?.latency[id] = ms
             self?.publish()
