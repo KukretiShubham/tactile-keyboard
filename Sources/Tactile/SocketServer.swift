@@ -9,7 +9,7 @@ final class SocketServer {
         let connection: NWConnection
         let address: String
         let input: InputTarget
-        var authenticated = false
+        var deviceID: String?
         var authTimeout: DispatchWorkItem?
 
         init(connection: NWConnection, address: String, input: InputTarget) {
@@ -24,6 +24,7 @@ final class SocketServer {
         var k: String?
         var token: String?
         var code: String?
+        var name: String?
         var b: String?
         var s: String?
         var x: Double?
@@ -31,17 +32,29 @@ final class SocketServer {
         var r: Bool?
     }
 
+    /// Shown next to device names, e.g. "iPad · Tailscale".
+    let route: String
+    /// While true, input is ignored (the connection stays up).
+    var isPaused: () -> Bool = { false }
+    /// A device finished connecting; `isNew` when it just paired.
+    var onConnect: ((Pairing.Device, _ isNew: Bool) -> Void)?
+    /// Connected devices changed.
+    var onChange: (() -> Void)?
+
     private let listener: NWListener
     private let queue: DispatchQueue
     private let pairing: Pairing
     private let makeInput: () -> InputTarget
     private var clients: [ObjectIdentifier: Client] = [:]
 
+    /// IDs of paired devices connected right now.
+    var connectedDeviceIDs: [String] { clients.values.compactMap(\.deviceID) }
+
     /// - Parameters:
     ///   - appPort: Port of the page that serves the app; only that page may connect.
     ///   - tls: Always set in normal use. Nil only for the dry-run development
     ///     copy, which is also limited to this Mac (`loopbackOnly`).
-    init(port: UInt16, appPort: UInt16, tls: NWProtocolTLS.Options?, loopbackOnly: Bool = false,
+    init(port: UInt16, appPort: UInt16, tls: NWProtocolTLS.Options?, loopbackOnly: Bool = false, route: String,
          pairing: Pairing, queue: DispatchQueue, makeInput: @escaping () -> InputTarget) throws {
         let scheme = tls == nil ? "http" : "https"
         let options = NWProtocolWebSocket.Options()
@@ -62,6 +75,7 @@ final class SocketServer {
         parameters.defaultProtocolStack.applicationProtocols.insert(options, at: 0)
         listener = try NWListener.make(parameters, port: port, loopbackOnly: loopbackOnly)
 
+        self.route = route
         self.queue = queue
         self.pairing = pairing
         self.makeInput = makeInput
@@ -70,21 +84,34 @@ final class SocketServer {
     func start() {
         listener.newConnectionHandler = { [weak self] connection in self?.accept(connection) }
         listener.stateUpdateHandler = { state in
-            if case .failed(let error) = state {
-                fputs("Socket server failed: \(error)\n", stderr)
-                exit(1)
-            }
+            if case .failed(let error) = state { Fatal.report("The secure connection couldn't start: \(error)") }
         }
         listener.start(queue: queue)
     }
 
-    /// Releases everything every iPad is holding. Call on the server queue.
+    /// Stops listening and lets go of everything every iPad is holding.
+    /// Call on the server queue.
     func stop() {
-        for client in clients.values {
+        listener.cancel()
+        let all = clients.values
+        clients.removeAll()
+        for client in all {
             client.input.releaseAll()
             client.connection.cancel()
         }
-        clients.removeAll()
+        onChange?()
+    }
+
+    /// Releases held keys and buttons for every connected iPad.
+    func releaseAllInput() {
+        clients.values.forEach { $0.input.releaseAll() }
+    }
+
+    /// Disconnects a device right away (for example after it's revoked).
+    func disconnect(deviceID: String?) {
+        for client in clients.values where deviceID == nil || client.deviceID == deviceID {
+            client.connection.cancel()
+        }
     }
 
     // MARK: Connections
@@ -103,7 +130,7 @@ final class SocketServer {
         connection.start(queue: queue)
 
         let timeout = DispatchWorkItem { [weak client] in
-            if let client, !client.authenticated { client.connection.cancel() }
+            if let client, client.deviceID == nil { client.connection.cancel() }
         }
         client.authTimeout = timeout
         queue.asyncAfter(deadline: .now() + 120, execute: timeout)
@@ -114,7 +141,10 @@ final class SocketServer {
         guard let client = clients.removeValue(forKey: id) else { return }
         client.authTimeout?.cancel()
         client.input.releaseAll()
-        if client.authenticated { Log.info("Disconnected \(client.address)") }
+        if client.deviceID != nil {
+            Log.info("Disconnected \(client.address)")
+            onChange?()
+        }
     }
 
     private func receive(_ client: Client) {
@@ -148,10 +178,19 @@ final class SocketServer {
 
     private func handle(_ data: Data, from client: Client) {
         guard let message = try? JSONDecoder().decode(Message.self, from: data) else { return }
-        guard client.authenticated else { return authenticate(message, client) }
+        guard let deviceID = client.deviceID else { return authenticate(message, client) }
+
+        // A device revoked while connected loses access at once.
+        guard pairing.devices.contains(where: { $0.id == deviceID }) else {
+            client.connection.cancel()
+            return
+        }
 
         let input = client.input
         switch message.t {
+        case "ping": reply(client, ["t": "pong"])
+        case "rel": input.releaseAll()
+        case _ where isPaused(): break
         case "kd": if let key = message.k { input.keyDown(key, isRepeat: message.r ?? false) }
         case "ku": if let key = message.k { input.keyUp(key) }
         case "mv": input.move(dx: Self.limit(message.x, 800), dy: Self.limit(message.y, 800))
@@ -160,8 +199,6 @@ final class SocketServer {
         case "sc": input.scroll(dx: Self.limit(message.x, 2000), dy: Self.limit(message.y, 2000))
         case "sys": if let action = message.k { input.system(action) }
         case "txt": if let text = message.s, text.count <= 4000 { input.type(text) }
-        case "rel": input.releaseAll()
-        case "ping": reply(client, ["t": "pong"])
         default: break
         }
     }
@@ -172,15 +209,17 @@ final class SocketServer {
         }
         switch message.t {
         case "hello":
-            if let token = message.token, pairing.isTrusted(token: token) {
-                grant(client, token: nil)
+            if let token = message.token, let device = pairing.device(forToken: token) {
+                pairing.nameIfUnnamed(device.id, as: "\(Self.deviceName(message.name)) · \(route)")
+                grant(client, device: device, token: nil)
             } else {
                 reply(client, ["t": "pair"])
             }
         case "pair":
-            if let code = message.code, let token = pairing.redeem(code: code, from: client.address) {
-                Log.info("Paired a new device at \(client.address)")
-                grant(client, token: token)
+            let name = "\(Self.deviceName(message.name)) · \(route)"
+            if let code = message.code, let paired = pairing.redeem(code: code, from: client.address, name: name) {
+                Log.info("Paired \(name) at \(client.address)")
+                grant(client, device: paired.device, token: paired.token)
             } else {
                 let reason = pairing.isLocked(client.address) ? "locked" : "code"
                 reply(client, ["t": "denied", "reason": reason])
@@ -190,16 +229,25 @@ final class SocketServer {
         }
     }
 
-    private func grant(_ client: Client, token: String?) {
-        client.authenticated = true
+    private func grant(_ client: Client, device: Pairing.Device, token: String?) {
+        client.deviceID = device.id
         client.authTimeout?.cancel()
+        pairing.markSeen(device.id)
         var payload = ["t": "ready", "name": HostInfo.computerName]
         if let token { payload["token"] = token }
         reply(client, payload)
-        Log.info("Connected \(client.address)")
+        Log.info("Connected \(device.name) (\(client.address))")
+        onConnect?(device, token != nil)
+        onChange?()
     }
 
     // MARK: Helpers
+
+    /// The browser's own guess at what it is, limited to a few known names.
+    private static func deviceName(_ claimed: String?) -> String {
+        let known = ["iPad", "iPhone", "Android device", "Mac", "Browser"]
+        return known.first { $0 == claimed } ?? "Browser"
+    }
 
     private static func limit(_ value: Double?, _ bound: Double) -> Double {
         guard let value, value.isFinite else { return 0 }

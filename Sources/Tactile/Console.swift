@@ -56,34 +56,53 @@ enum HostInfo {
     }
 }
 
+/// How unrecoverable errors reach the user: printed in Terminal, or an alert
+/// in the menu bar app (which sets its own handler).
+enum Fatal {
+    static var handler: (String) -> Void = { message in
+        fputs("\(message)\n", stderr)
+        exit(1)
+    }
+
+    static func report(_ message: String) { handler(message) }
+}
+
+enum QRCode {
+    /// A QR code with one pixel per module; scale it up without smoothing.
+    static func image(for text: String) -> CIImage? {
+        guard let filter = CIFilter(name: "CIQRCodeGenerator") else { return nil }
+        filter.setValue(Data(text.utf8), forKey: "inputMessage")
+        filter.setValue("M", forKey: "inputCorrectionLevel")
+        return filter.outputImage
+    }
+}
+
+/// What Terminal shows when Tactile runs outside the menu bar app.
 enum Banner {
-    static func show(setupPort: UInt16, appPort: UInt16, tailscaleURL: String?, code: String, fingerprint: String, dryRun: Bool) {
-        let hosts = [HostInfo.bonjourName].compactMap { $0 } + HostInfo.ipv4Addresses
-        let host = hosts.first ?? "localhost"
-        let setupURL = "http://\(host):\(setupPort)"
-        let spacedCode = "\(code.prefix(3)) \(code.suffix(3))"
+    static func show(_ state: TactileService.Snapshot) {
         let bold = "\u{1B}[1m", dim = "\u{1B}[2m", reset = "\u{1B}[0m"
+        let spacedCode = "\(state.code.prefix(3)) \(state.code.suffix(3))"
 
         print("")
-        print("  \(bold)Tactile is running\(reset) 🔒\(dryRun ? "  \(dim)(dry run — input is only logged)\(reset)" : "")")
+        print("  \(bold)Tactile is running\(reset) 🔒\(state.dryRun ? "  \(dim)(dry run — input is only logged)\(reset)" : "")")
         print("")
         // Scanning pairs too: the code rides after "#", which never leaves the iPad.
-        qrLines(for: "\(setupURL)/#pair=\(code)").forEach { print("  \($0)") }
+        qrLines(for: state.pairingLink).forEach { print("  \($0)") }
         print("")
-        if let tailscaleURL {
+        if let tailscaleURL = state.tailscaleURL {
             print("  With Tailscale      \(bold)\(tailscaleURL)\(reset)")
             print("  \(dim)(iPads running Tailscale open this directly — no certificate setup)\(reset)")
             print("")
         }
-        print("  Open on your iPad   \(bold)\(setupURL)\(reset)")
-        hosts.dropFirst().forEach { print("                      http://\($0):\(setupPort)") }
-        print(tailscaleURL == nil
-              ? "  \(dim)(It installs this Mac's certificate once, then opens https://\(host):\(appPort))\(reset)"
+        print("  Open on your iPad   \(bold)\(state.setupURLs.first ?? "")\(reset)")
+        state.setupURLs.dropFirst().forEach { print("                      \($0)") }
+        print(state.tailscaleURL == nil
+              ? "  \(dim)(It installs this Mac's certificate once, then opens \(state.localURL))\(reset)"
               : "  \(dim)(Goes to Tailscale when it can; otherwise sets up this Mac's certificate once)\(reset)")
         print("  Pairing code        \(bold)\(spacedCode)\(reset)")
         print("")
-        print("  Certificate SHA-256 \(fingerprint.prefix(47))")
-        print("                      \(fingerprint.dropFirst(48))")
+        print("  Certificate SHA-256 \(state.fingerprint.prefix(47))")
+        print("                      \(state.fingerprint.dropFirst(48))")
         print("  \(dim)Check it matches the one on the iPad's setup page before trusting it.\(reset)")
         print("")
         print("  \(dim)Tip: open the secure page, then Share → Add to Home Screen for full screen.\(reset)")
@@ -93,10 +112,7 @@ enum Banner {
 
     /// Renders a QR code with half-block characters, two modules per line.
     private static func qrLines(for text: String) -> [String] {
-        guard let filter = CIFilter(name: "CIQRCodeGenerator") else { return [] }
-        filter.setValue(Data(text.utf8), forKey: "inputMessage")
-        filter.setValue("M", forKey: "inputCorrectionLevel")
-        guard let image = filter.outputImage else { return [] }
+        guard let image = QRCode.image(for: text) else { return [] }
 
         let extent = image.extent.integral
         let width = Int(extent.width), height = Int(extent.height)

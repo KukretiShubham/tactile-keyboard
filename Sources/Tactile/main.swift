@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 
 setvbuf(stdout, nil, _IOLBF, 0)
 
@@ -31,109 +31,88 @@ if arguments.contains("--forget-devices") {
     exit(0)
 }
 
-let setupPort = option("--port").flatMap(UInt16.init) ?? 8420
-let localPorts = (app: setupPort + 1, socket: setupPort + 2)
-let tailscalePorts = (app: setupPort + 3, socket: setupPort + 4)
-let dryRun = arguments.contains("--dry-run")
-let queue = DispatchQueue(label: "tactile.server")
+// Inside Tactile.app there's no Terminal, so output goes to a log file
+// (the menu has "Show Log").
+let isApp = Bundle.main.bundleIdentifier != nil
+if isApp {
+    let logs = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0].appendingPathComponent("Logs")
+    try? FileManager.default.createDirectory(at: logs, withIntermediateDirectories: true)
+    let log = logs.appendingPathComponent("Tactile.log")
+    if let size = (try? FileManager.default.attributesOfItem(atPath: log.path))?[.size] as? Int, size > 1_000_000 {
+        try? FileManager.default.removeItem(at: log)
+    }
+    freopen(log.path, "a", stdout)
+    freopen(log.path, "a", stderr)
+    setvbuf(stdout, nil, _IOLBF, 0)
+}
 
-guard let webRoot = Bundle.module.url(forResource: "Web", withExtension: nil) else {
-    fputs("Web resources are missing from the build.\n", stderr)
+/// The app bundle keeps the web files in Contents/Resources; `swift run`
+/// keeps them in SwiftPM's resource bundle.
+func locateWebRoot() -> URL? {
+    if let url = Bundle.main.resourceURL?.appendingPathComponent("Web"),
+       FileManager.default.fileExists(atPath: url.appendingPathComponent("index.html").path) {
+        return url
+    }
+    return Bundle.module.url(forResource: "Web", withExtension: nil)
+}
+
+guard let webRoot = locateWebRoot() else {
+    Fatal.report("Web resources are missing from the build.")
     exit(1)
 }
 
+let dryRun = arguments.contains("--dry-run")
 if !dryRun && !Accessibility.isTrusted(prompt: true) {
     Log.warn("""
     Accessibility access is off, so input can't reach other apps yet.
-      Open System Settings → Privacy & Security → Accessibility and allow the app
-      you launched Tactile from (for example Terminal), then restart Tactile.
+      Open System Settings → Privacy & Security → Accessibility and allow \(isApp ? "Tactile" : "the app you launched Tactile from (for example Terminal)").
     """)
 }
 
-let pairing = Pairing()
+let preferences = UserDefaults.standard
+preferences.register(defaults: ["useTailscale": true, "notifyOnConnect": true])
+let service = TactileService(
+    webRoot: webRoot,
+    setupPort: option("--port").flatMap(UInt16.init) ?? 8420,
+    dryRun: dryRun,
+    useTailscale: !arguments.contains("--no-tailscale") && preferences.bool(forKey: "useTailscale")
+)
 
-// Two ways to get a certificate the iPad trusts:
-//  - Tailscale: a real Let's Encrypt certificate for this Mac's tailnet name.
-//    iPads running Tailscale need no setup at all.
-//  - Local: this Mac's own certificate authority, which other iPads trust once.
-let local: LocalAuthority = {
-    do {
-        return try LocalAuthority.prepare(hostName: HostInfo.bonjourName, addresses: HostInfo.ipv4Addresses)
-    } catch {
-        fputs("Could not create the HTTPS certificate: \(error)\n", stderr)
-        exit(1)
+// In Terminal, show the QR code and pairing code whenever they change.
+if !isApp {
+    var printedFor: String?
+    service.observe { state in
+        guard state.running, printedFor != state.code else { return }
+        if printedFor != nil { Log.info("That pairing code is used up. Here's a new one for the next device:") }
+        printedFor = state.code
+        Banner.show(state)
     }
-}()
-let tailscale = arguments.contains("--no-tailscale") ? nil : Tailscale.certificate()
-HostInfo.tailscaleName = tailscale?.host
-let tailscaleURL = tailscale.map { "https://\($0.host):\(tailscalePorts.app)/" }
-
-// The app is only served over HTTPS. Plain HTTP serves just the setup page,
-// which sends the iPad to whichever secure address it can use.
-let assets = HTTPServer.loadAssets(from: webRoot)
-let appAssets = assets.filter { !$0.key.hasPrefix("/setup/") }
-var setupAssets = assets.filter { $0.key.hasPrefix("/setup/") || $0.key == "/icon.svg" || $0.key == "/apple-touch-icon.png" }
-setupAssets["/index.html"] = assets["/setup/index.html"]
-var setupInfo: [String: Any] = ["appPort": Int(localPorts.app), "fingerprint": local.fingerprint, "caName": local.caName]
-if let tailscaleURL { setupInfo["tailscaleURL"] = tailscaleURL }
-setupAssets["/setup.json"] = HTTPServer.json(setupInfo)
-setupAssets["/tactile-ca.crt"] = HTTPServer.Asset(body: local.caDER, type: "application/x-x509-ca-cert")
-
-let basePolicy = "default-src 'self'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'"
-let makeInput = { dryRun ? LoggingInput() as InputTarget : InputSession() }
-
-/// The keyboard page and its socket, served with one certificate. Without a
-/// certificate (dry-run development copy only) both listen on 127.0.0.1 alone.
-func appServers(_ identity: TLSIdentity?, ports: (app: UInt16, socket: UInt16)) throws -> (HTTPServer, SocketServer) {
-    var pageAssets = appAssets
-    pageAssets["/config.json"] = HTTPServer.json(["socketPort": Int(ports.socket)])
-    let loopbackOnly = identity == nil
-    let page = try HTTPServer(port: ports.app, tls: identity?.options(), assets: pageAssets,
-                              policy: "\(basePolicy); connect-src 'self' \(loopbackOnly ? "ws:" : "wss:")",
-                              loopbackOnly: loopbackOnly, queue: queue)
-    let socket = try SocketServer(port: ports.socket, appPort: ports.app, tls: identity?.options(),
-                                  loopbackOnly: loopbackOnly, pairing: pairing, queue: queue, makeInput: makeInput)
-    return (page, socket)
 }
 
-let devPorts = (app: setupPort + 5, socket: setupPort + 6)
+let app = NSApplication.shared
+app.setActivationPolicy(.accessory)
+let menuBar = MenuBarController(service: service, isApp: isApp)
 
-let servers: (pages: [HTTPServer], sockets: [SocketServer]) = {
-    do {
-        let setup = try HTTPServer(port: setupPort, tls: nil, assets: setupAssets,
-                                   policy: "\(basePolicy); connect-src 'self' https:", queue: queue)
-        var apps = [try appServers(local.identity, ports: localPorts)]
-        if let tailscale { apps.append(try appServers(tailscale.identity, ports: tailscalePorts)) }
-        // Lets a browser on this Mac try the UI without trusting the certificate.
-        // Input is only logged in a dry run, so nothing here can control the Mac.
-        if dryRun { apps.append(try appServers(nil, ports: devPorts)) }
-        return ([setup] + apps.map(\.0), apps.map(\.1))
-    } catch {
-        fputs("Could not start Tactile: \(error)\n", stderr)
-        exit(1)
+if isApp {
+    Fatal.handler = { message in
+        DispatchQueue.main.async {
+            Log.warn(message)
+            NSApp.activate()
+            let alert = NSAlert()
+            alert.messageText = "Tactile can't continue"
+            alert.informativeText = message
+            alert.runModal()
+            exit(1)
+        }
     }
-}()
-
-servers.pages.forEach { $0.start() }
-servers.sockets.forEach { $0.start() }
-
-func showBanner() {
-    Banner.show(setupPort: setupPort, appPort: localPorts.app, tailscaleURL: tailscaleURL,
-                code: pairing.code, fingerprint: local.fingerprint, dryRun: dryRun)
-}
-showBanner()
-if dryRun { print("  Dry-run page for this Mac only: http://127.0.0.1:\(devPorts.app)\n") }
-pairing.onNewCode = {
-    Log.info("That pairing code is used up. Here's a new one for the next iPad:")
-    showBanner()
 }
 
 signal(SIGINT, SIG_IGN)
 signal(SIGTERM, SIG_IGN)
 let stopSources = [SIGINT, SIGTERM].map { sig -> DispatchSourceSignal in
-    let source = DispatchSource.makeSignalSource(signal: sig, queue: queue)
+    let source = DispatchSource.makeSignalSource(signal: sig, queue: .main)
     source.setEventHandler {
-        servers.sockets.forEach { $0.stop() }
+        service.stopAndWait()
         print("\nTactile stopped.")
         exit(0)
     }
@@ -141,4 +120,5 @@ let stopSources = [SIGINT, SIGTERM].map { sig -> DispatchSourceSignal in
     return source
 }
 
-dispatchMain()
+service.start()
+app.run()

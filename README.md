@@ -12,11 +12,26 @@ Turn an iPad into a Magic Keyboard–style keyboard and trackpad for your Mac, o
 
 Requires macOS 15 or later and the Swift toolchain (Xcode or Command Line Tools).
 
-```bash
-swift run -c release Tactile
-```
+Double-click `start-tactile.command`. It builds **Tactile.app** (only when the code has changed) and opens it. Tactile lives in the menu bar, next to Wi-Fi; there's no Dock icon or Terminal window. You can also move `build/Tactile.app` to Applications and open it from there.
 
-Or double-click `start-tactile.command`. Terminal shows a QR code, the setup address, a six-digit pairing code and the certificate fingerprint.
+The first time, macOS asks for **Accessibility** access for **Tactile**. macOS needs it before any app can type or move the pointer. If you used an earlier version that ran in Terminal, you can now switch Terminal off in that list.
+
+Developers can still run it in Terminal with `swift run -c release Tactile`, which prints the QR code and pairing code there.
+
+### The menu bar
+
+Click the Tactile icon in the menu bar. Hover over it to see the status. The icon itself shows the state at a glance: a filled keyboard when a device is connected, a pause icon when input is paused, and a warning when Accessibility access is missing.
+
+- **Status**: running, paused or stopped, and which devices are connected right now.
+- **Show Pairing Code…** (⌘P): a window with the QR code to scan, the code to type, and the addresses to open.
+- **Pause Input** (⌘.): devices stay connected, but nothing they send reaches the Mac.
+- **Stop / Start Tactile**: turns Tactile's network access off or on entirely.
+- **Paired Devices**: every paired device and when it was last used. Choose one to revoke it (it's disconnected immediately), or **Revoke All**.
+- **Settings**: Use Tailscale, Notify When a Device Connects, Open at Login, Show Log.
+
+Tactile sends a macOS notification when a new device pairs, and when a device connects after being away for a while.
+
+Each rebuild of the app is signed locally, so macOS may ask for Accessibility again. If typing stops working after an update, switch Tactile off and on again under System Settings → Privacy & Security → Accessibility.
 
 ### Fastest: Tailscale (no certificate setup)
 
@@ -76,6 +91,9 @@ Other settings (gear button, top right):
 iPad Safari ── TLS: HTTPS + secure WebSocket (JSON) ──▶ Tactile (Swift) ──▶ CGEvent ──▶ macOS
 ```
 
+- `Sources/Tactile/MenuBarController.swift`, `PairingWindow.swift` and `Notifier.swift` are the menu bar app. `TactileService.swift` owns the servers and pairing, and both the menu and Terminal mode drive it.
+- `Sources/Tactile/Pairing.swift` handles pairing codes, the paired-device list, expiry and wrong-code limits.
+- `build-app.sh` and `Packaging/` build and sign `Tactile.app`.
 - `Sources/Tactile/Tailscale.swift` asks Tailscale for a Let's Encrypt certificate for the Mac's tailnet name, when HTTPS certificates are enabled for the tailnet.
 - `Sources/Tactile/TLSIdentity.swift` keeps this Mac's private certificate authority (CA), the fallback, and issues a fresh HTTPS certificate on every launch for the Mac's current name and addresses.
 - `Sources/Tactile/HTTPServer.swift` serves files from memory, so only the bundled files can be requested. The app is served over HTTPS; plain HTTP serves only the setup page (`Web/setup/`) and the CA certificate.
@@ -88,6 +106,8 @@ iPad Safari ── TLS: HTTPS + secure WebSocket (JSON) ──▶ Tactile (Swift
 - **Encrypted:** everything you type travels over TLS 1.2 or later. The keyboard page and its socket refuse plain HTTP, and only accept connections from this Mac's own HTTPS page.
 - **Limited certificate authority:** the CA lives in `~/Library/Application Support/Tactile/tls/` (private key readable only by you). It is *name-constrained* to `.local` names and private IPv4 ranges (10/8, 172.16/12, 192.168/16, 100.64/10, 127/8). So even though the iPad trusts it, it cannot be used to impersonate websites on the internet.
 - **Verify before trusting:** the setup page itself is plain HTTP. Before turning on trust, check that the profile's SHA-256 fingerprint matches the one in Terminal.
-- **Pairing:** a random six-digit code that changes on every launch. Five wrong tries lock that address out for a minute.
-- **Remembered iPads:** each keeps a random 256-bit token. The Mac stores only SHA-256 hashes of these tokens. Tokens issued before encryption existed were discarded, so iPads pair again once.
+- **Pairing:** a random six-digit code that works once; a new one is issued after every pairing. Five wrong tries lock that address out for a minute. Because an attacker could switch addresses, 20 wrong tries from anywhere within 10 minutes also replaces the code and pauses all pairing for a minute.
+- **Remembered devices:** each keeps a random 256-bit token. The Mac stores only SHA-256 hashes of these tokens, with each device's name and when it was last used. Devices unused for 90 days must pair again. Revoking a device in the menu disconnects it at once.
+- **Visibility:** the menu bar always shows whether a device is connected, and macOS notifications announce new pairings.
+- **Its own permission:** Tactile.app holds the Accessibility permission itself, so other programs run from Terminal don't inherit the ability to control the Mac.
 - **Starting over:** delete the `tls` folder to replace the CA, and remove the old profile on the iPad under Settings → General → VPN & Device Management.

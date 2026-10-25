@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- macOS icon grid: an 824 pt rounded square centred on a 1024 canvas. -->
+  <defs>
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#26262b"/>
+      <stop offset="1" stop-color="#08080a"/>
+    </linearGradient>
+    <linearGradient id="cap" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1a1a1f"/>
+      <stop offset="1" stop-color="#0c0c0f"/>
+    </linearGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="22"/>
+    </filter>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#000" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#body)" filter="url(#shadow)"/>
+  <rect x="101.5" y="101.5" width="821" height="821" rx="184" fill="none" stroke="#ffffff" stroke-opacity="0.08" stroke-width="3"/>
+  <rect x="302" y="302" width="420" height="420" rx="92" fill="none" stroke="#0A84FF" stroke-width="26" filter="url(#glow)" opacity="0.95"/>
+  <rect x="302" y="302" width="420" height="420" rx="92" fill="url(#cap)" stroke="#4da3ff" stroke-width="12"/>
+  <text x="512" y="590" text-anchor="middle" font-family="-apple-system, Helvetica, sans-serif" font-size="230" fill="#dceaff">⌘</text>
+</svg>

@@ -2,6 +2,17 @@ import { storage } from './settings.js';
 
 const TOKEN_KEY = 'tactile.token';
 
+// How this device is listed in the Mac's Paired Devices menu. iPadOS Safari
+// reports itself as a Mac, so a touch screen gives it away.
+function deviceName() {
+  const ua = navigator.userAgent;
+  if (/iPhone/.test(ua)) return 'iPhone';
+  if (/iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return 'iPad';
+  if (/Android/.test(ua)) return 'Android device';
+  if (/Macintosh/.test(ua)) return 'Mac';
+  return 'Browser';
+}
+
 // Talks to the Mac. States: connecting → pairing | ready, and offline between retries.
 export class Connection extends EventTarget {
   #socket = null;
@@ -75,7 +86,7 @@ export class Connection extends EventTarget {
   }
 
   pair(code) {
-    this.#raw({ t: 'pair', code });
+    this.#raw({ t: 'pair', code, name: deviceName() });
   }
 
   forget() {
@@ -94,7 +105,7 @@ export class Connection extends EventTarget {
 
     socket.onopen = () => {
       this.#retry = 500;
-      this.#raw({ t: 'hello', token: storage.get(TOKEN_KEY) ?? undefined });
+      this.#raw({ t: 'hello', token: storage.get(TOKEN_KEY) ?? undefined, name: deviceName() });
     };
 
     socket.onmessage = (event) => {

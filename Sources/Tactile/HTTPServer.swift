@@ -56,13 +56,19 @@ final class HTTPServer {
 
     func start() {
         listener.newConnectionHandler = { [weak self] connection in self?.accept(connection) }
-        listener.stateUpdateHandler = { state in
+        listener.stateUpdateHandler = { [port = listener.port] state in
             if case .failed(let error) = state {
-                fputs("Web server failed: \(error)\n", stderr)
-                exit(1)
+                let busy = if case .posix(.EADDRINUSE) = error { true } else { false }
+                Fatal.report(busy
+                    ? "Port \(port.map { "\($0)" } ?? "?") is already in use. Is Tactile already running?"
+                    : "The web server couldn't start: \(error)")
             }
         }
         listener.start(queue: queue)
+    }
+
+    func stop() {
+        listener.cancel()
     }
 
     private func accept(_ connection: NWConnection) {
