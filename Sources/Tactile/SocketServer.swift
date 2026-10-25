@@ -37,7 +37,8 @@ final class SocketServer {
     private let makeInput: () -> InputTarget
     private var clients: [ObjectIdentifier: Client] = [:]
 
-    init(port: UInt16, httpPort: UInt16, pairing: Pairing, queue: DispatchQueue,
+    /// - Parameter appPort: Port of the HTTPS page; only that page may connect.
+    init(port: UInt16, appPort: UInt16, tls: NWProtocolTLS.Options, pairing: Pairing, queue: DispatchQueue,
          makeInput: @escaping () -> InputTarget) throws {
         let options = NWProtocolWebSocket.Options()
         options.autoReplyPing = true
@@ -45,11 +46,14 @@ final class SocketServer {
         options.setClientRequestHandler(queue) { _, headers in
             // Only the page this Mac serves may open the socket.
             let origin = headers.first { $0.name.caseInsensitiveCompare("Origin") == .orderedSame }?.value
-            let allowed = origin.map { Self.isAllowedOrigin($0, port: httpPort) } ?? true
+            let allowed = origin.map { Self.isAllowedOrigin($0, port: appPort) } ?? true
             return NWProtocolWebSocket.Response(status: allowed ? .accept : .reject, subprotocol: nil, additionalHeaders: nil)
         }
 
-        let parameters = NWParameters.tcp
+        // Small, frequent messages: send each one right away instead of batching.
+        let tcp = NWProtocolTCP.Options()
+        tcp.noDelay = true
+        let parameters = NWParameters(tls: tls, tcp: tcp)
         parameters.allowLocalEndpointReuse = true
         parameters.defaultProtocolStack.applicationProtocols.insert(options, at: 0)
         listener = try NWListener(using: parameters, on: NWEndpoint.Port(rawValue: port)!)
@@ -153,6 +157,7 @@ final class SocketServer {
         case "sys": if let action = message.k { input.system(action) }
         case "txt": if let text = message.s, text.count <= 4000 { input.type(text) }
         case "rel": input.releaseAll()
+        case "ping": reply(client, ["t": "pong"])
         default: break
         }
     }
@@ -203,7 +208,8 @@ final class SocketServer {
     }
 
     private static func isAllowedOrigin(_ origin: String, port: UInt16) -> Bool {
-        guard let url = URL(string: origin), let host = url.host?.lowercased(), url.port == Int(port) else { return false }
+        guard let url = URL(string: origin), url.scheme == "https",
+              let host = url.host?.lowercased(), url.port == Int(port) else { return false }
         return HostInfo.reachableHosts.contains(host)
     }
 }

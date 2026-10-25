@@ -8,7 +8,7 @@ const TAP_SLOP = 10;
 const HOLD_TO_DRAG = 380;
 const SWIPE_DISTANCE = 70;
 
-export function createTrackpad(el, { send, feedback, settings, onClick }) {
+export function createTrackpad(el, { send, feedback, settings, onClick, isCongested }) {
   const touches = new Map();
   let gesture = null;
   let dragging = false;
@@ -18,9 +18,15 @@ export function createTrackpad(el, { send, feedback, settings, onClick }) {
   const velocity = { x: 0, y: 0, at: 0 };
   let glide = 0;
 
-  // Coalesce pointer events into one message per display frame.
+  // Coalesce pointer events into one message per display frame. While the
+  // network is backed up (Wi-Fi waking from sleep), keep adding up movement and
+  // send it as one move once it drains, rather than a burst of stale ones.
   function flush() {
     frame = 0;
+    if (isCongested()) {
+      schedule();
+      return;
+    }
     if (pending.mx || pending.my) {
       send({ t: 'mv', x: +pending.mx.toFixed(1), y: +pending.my.toFixed(1) });
       pending.mx = pending.my = 0;
@@ -175,6 +181,9 @@ export function createTrackpad(el, { send, feedback, settings, onClick }) {
     reset() {
       stopGlide();
       clearTimeout(holdTimer);
+      cancelAnimationFrame(frame);
+      frame = 0;
+      pending.mx = pending.my = pending.sx = pending.sy = 0;
       touches.clear();
       gesture = null;
       dragging = false;

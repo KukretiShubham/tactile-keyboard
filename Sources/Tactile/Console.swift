@@ -53,23 +53,28 @@ enum HostInfo {
 }
 
 enum Banner {
-    static func show(port: UInt16, code: String, dryRun: Bool) {
-        let urls = ([HostInfo.bonjourName].compactMap { $0 } + HostInfo.ipv4Addresses).map { "http://\($0):\(port)" }
+    static func show(setupPort: UInt16, appPort: UInt16, code: String, fingerprint: String, dryRun: Bool) {
+        let hosts = [HostInfo.bonjourName].compactMap { $0 } + HostInfo.ipv4Addresses
+        let host = hosts.first ?? "localhost"
+        let setupURL = "http://\(host):\(setupPort)"
         let spacedCode = "\(code.prefix(3)) \(code.suffix(3))"
         let bold = "\u{1B}[1m", dim = "\u{1B}[2m", reset = "\u{1B}[0m"
 
         print("")
-        print("  \(bold)Tactile is running\(reset)\(dryRun ? "  \(dim)(dry run — input is only logged)\(reset)" : "")")
+        print("  \(bold)Tactile is running\(reset) 🔒\(dryRun ? "  \(dim)(dry run — input is only logged)\(reset)" : "")")
         print("")
-        if let first = urls.first {
-            qrLines(for: first).forEach { print("  \($0)") }
-            print("")
-        }
-        print("  Open on your iPad   \(bold)\(urls.first ?? "http://localhost:\(port)")\(reset)")
-        urls.dropFirst().forEach { print("                      \($0)") }
+        qrLines(for: setupURL).forEach { print("  \($0)") }
+        print("")
+        print("  Open on your iPad   \(bold)\(setupURL)\(reset)")
+        hosts.dropFirst().forEach { print("                      http://\($0):\(setupPort)") }
+        print("  \(dim)(It installs this Mac's certificate once, then opens https://\(host):\(appPort))\(reset)")
         print("  Pairing code        \(bold)\(spacedCode)\(reset)")
         print("")
-        print("  \(dim)Tip: in Safari tap Share → Add to Home Screen for a full-screen keyboard.\(reset)")
+        print("  Certificate SHA-256 \(fingerprint.prefix(47))")
+        print("                      \(fingerprint.dropFirst(48))")
+        print("  \(dim)Check it matches the one on the iPad's setup page before trusting it.\(reset)")
+        print("")
+        print("  \(dim)Tip: open the secure page, then Share → Add to Home Screen for full screen.\(reset)")
         print("  \(dim)Press Ctrl-C to stop.\(reset)")
         print("")
     }

@@ -15,8 +15,9 @@ export class Connection extends EventTarget {
       const response = await fetch('config.json', { cache: 'no-store' });
       const { socketPort } = await response.json();
       const host = location.hostname.includes(':') ? `[${location.hostname}]` : location.hostname;
-      this.#url = `ws://${host}:${socketPort}`;
+      this.#url = `wss://${host}:${socketPort}`;
       this.#open();
+      this.#watch();
     } catch {
       this.#setState('offline');
       setTimeout(() => this.start(), 2000);
@@ -27,6 +28,48 @@ export class Connection extends EventTarget {
     if (this.state === 'ready' && this.#socket?.readyState === WebSocket.OPEN) {
       this.#socket.send(JSON.stringify(message));
     }
+  }
+
+  /** True while earlier messages are still waiting to leave the iPad. */
+  get congested() {
+    return (this.#socket?.bufferedAmount ?? 0) > 0;
+  }
+
+  // A socket can look open after the iPad sleeps even though the connection is
+  // gone. Ping on wake (and every few seconds) and start over if the Mac
+  // doesn't answer quickly, instead of waiting for the browser to notice.
+  #lastPong = 0;
+  #probe = 0;
+
+  #ping(timeout) {
+    if (this.state !== 'ready') return;
+    const sentAt = performance.now();
+    this.#raw({ t: 'ping' });
+    clearTimeout(this.#probe);
+    this.#probe = setTimeout(() => {
+      if (this.#lastPong < sentAt) this.#reconnect();
+    }, timeout);
+  }
+
+  #reconnect() {
+    const old = this.#socket;
+    this.#socket = null;
+    if (old) {
+      old.onclose = null;
+      old.onmessage = null;
+      try { old.close(); } catch { /* already gone */ }
+    }
+    this.#retry = 500;
+    this.#open();
+  }
+
+  #watch() {
+    setInterval(() => this.#ping(4000), 5000);
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) return;
+      if (this.state === 'ready') this.#ping(1500);
+      else if (this.state === 'offline') this.#reconnect();
+    });
   }
 
   pair(code) {
@@ -55,7 +98,9 @@ export class Connection extends EventTarget {
     socket.onmessage = (event) => {
       let message;
       try { message = JSON.parse(event.data); } catch { return; }
-      if (message.t === 'ready') {
+      if (message.t === 'pong') {
+        this.#lastPong = performance.now();
+      } else if (message.t === 'ready') {
         if (message.token) storage.set(TOKEN_KEY, message.token);
         this.macName = message.name || 'Mac';
         this.#setState('ready');

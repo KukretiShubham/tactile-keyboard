@@ -1,17 +1,18 @@
 import Foundation
 import Network
 
-/// Serves the iPad web app. Every file is loaded into memory at launch,
-/// so requests can only ever reach files that ship with the app.
+/// A tiny static file server. It only ever serves the in-memory assets it was
+/// given, so requests can't reach anything else on disk.
 final class HTTPServer {
-    private struct Asset {
+    struct Asset {
         let body: Data
         let type: String
     }
 
     private let listener: NWListener
     private let queue: DispatchQueue
-    private var assets: [String: Asset] = [:]
+    private let assets: [String: Asset]
+    private let policy: String
 
     private static let types = [
         "html": "text/html; charset=utf-8",
@@ -23,20 +24,32 @@ final class HTTPServer {
         "png": "image/png",
     ]
 
-    init(port: UInt16, socketPort: UInt16, webRoot: URL, queue: DispatchQueue) throws {
-        let parameters = NWParameters.tcp
+    /// Loads every servable file under `root`, keyed by its URL path.
+    static func loadAssets(from root: URL) -> [String: Asset] {
+        var assets: [String: Asset] = [:]
+        let rootPath = root.standardizedFileURL.path
+        let files = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)
+        while let url = files?.nextObject() as? URL {
+            guard let type = types[url.pathExtension], let body = try? Data(contentsOf: url) else { continue }
+            assets[String(url.standardizedFileURL.path.dropFirst(rootPath.count))] = Asset(body: body, type: type)
+        }
+        return assets
+    }
+
+    static func json(_ object: [String: Any]) -> Asset {
+        Asset(body: (try? JSONSerialization.data(withJSONObject: object)) ?? Data("{}".utf8), type: types["json"]!)
+    }
+
+    /// - Parameters:
+    ///   - tls: Serve HTTPS with these options, or plain HTTP when nil.
+    ///   - policy: The page's Content-Security-Policy.
+    init(port: UInt16, tls: NWProtocolTLS.Options?, assets: [String: Asset], policy: String, queue: DispatchQueue) throws {
+        let parameters = tls.map { NWParameters(tls: $0) } ?? .tcp
         parameters.allowLocalEndpointReuse = true
         listener = try NWListener(using: parameters, on: NWEndpoint.Port(rawValue: port)!)
+        self.assets = assets
+        self.policy = policy
         self.queue = queue
-
-        let files = FileManager.default.enumerator(at: webRoot, includingPropertiesForKeys: nil)
-        while let url = files?.nextObject() as? URL {
-            guard let type = Self.types[url.pathExtension], let body = try? Data(contentsOf: url) else { continue }
-            let path = String(url.standardizedFileURL.path.dropFirst(webRoot.standardizedFileURL.path.count))
-            assets[path] = Asset(body: body, type: type)
-        }
-        let config = try JSONSerialization.data(withJSONObject: ["socketPort": Int(socketPort)])
-        assets["/config.json"] = Asset(body: config, type: Self.types["json"]!)
     }
 
     func start() {
@@ -94,7 +107,7 @@ final class HTTPServer {
             "X-Content-Type-Options: nosniff",
             "X-Frame-Options: DENY",
             "Referrer-Policy: no-referrer",
-            "Content-Security-Policy: default-src 'self'; connect-src 'self' ws:; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'",
+            "Content-Security-Policy: \(policy)",
             "Connection: close",
         ].joined(separator: "\r\n") + "\r\n\r\n"
 

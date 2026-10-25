@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark light">
+  <title>Set Up Tactile</title>
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="stylesheet" href="/setup/setup.css">
+  <script type="module" src="/setup/setup.js"></script>
+</head>
+<body>
+  <main class="setup">
+    <img class="app-icon" src="/apple-touch-icon.png" alt="">
+    <h1>Secure Your Connection</h1>
+    <p class="lead">Tactile encrypts everything you type between this iPad and your Mac. To do that, this iPad needs to trust your Mac's certificate. You only do this once.</p>
+
+    <ol class="steps">
+      <li class="step">
+        <span class="step-number">1</span>
+        <div class="step-body">
+          <h2>Download the certificate</h2>
+          <p>Safari asks to download a configuration profile. Tap <b>Allow</b>.</p>
+          <a class="button" href="/tactile-ca.crt">Download Certificate</a>
+        </div>
+      </li>
+      <li class="step">
+        <span class="step-number">2</span>
+        <div class="step-body">
+          <h2>Install the profile</h2>
+          <p>Open <b>Settings</b>, tap <b>Profile Downloaded</b> near the top, then tap <b>Install</b>. Tap <b>More Details</b> first to compare its SHA-256 fingerprint with the one in Terminal on your Mac:</p>
+          <code class="fingerprint" id="fingerprint">…</code>
+        </div>
+      </li>
+      <li class="step">
+        <span class="step-number">3</span>
+        <div class="step-body">
+          <h2>Turn on full trust</h2>
+          <p>In Settings, go to <b>General → About → Certificate Trust Settings</b> and turn on <b id="caName">Tactile CA</b>.</p>
+        </div>
+      </li>
+      <li class="step" id="finalStep">
+        <span class="step-number">4</span>
+        <div class="step-body">
+          <h2>Open Tactile</h2>
+          <p class="status" id="status"><span class="spinner"></span>Waiting for this iPad to trust the certificate…</p>
+          <a class="button prominent" id="openButton" aria-disabled="true">Open Tactile</a>
+        </div>
+      </li>
+    </ol>
+
+    <p class="footnote">The certificate can only be used for local names and private network addresses, so it can't be used to intercept websites on the internet.</p>
+  </main>
+</body>
+</html>

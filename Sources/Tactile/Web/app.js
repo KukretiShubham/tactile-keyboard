@@ -19,7 +19,9 @@ const send = (message) => connection.send(message);
 
 const keyboard = createKeyboard(document.getElementById('keyboard'), { send, feedback });
 const trackpad = createTrackpad(document.getElementById('trackpad'), {
-  send, feedback, settings, onClick: () => keyboard.releaseLatched(),
+  send, feedback, settings,
+  onClick: () => keyboard.releaseLatched(),
+  isCongested: () => connection.congested,
 });
 const sheets = setupSheets({ connection, feedback });
 

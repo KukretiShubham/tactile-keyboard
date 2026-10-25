@@ -14,6 +14,8 @@ final class Pairing {
 
     init() {
         code = (0..<6).map { _ in String(Int.random(in: 0...9)) }.joined()
+        // Tokens issued before HTTPS existed crossed the network unencrypted.
+        try? FileManager.default.removeItem(at: Self.legacyStoreURL)
         trusted = Self.load()
     }
 
@@ -54,10 +56,13 @@ final class Pairing {
 
     // MARK: Storage
 
-    private static var storeURL: URL {
-        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        return support.appendingPathComponent("Tactile/trusted-devices.json")
+    private static var supportURL: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Tactile", isDirectory: true)
     }
+
+    private static var storeURL: URL { supportURL.appendingPathComponent("paired-devices.json") }
+    private static var legacyStoreURL: URL { supportURL.appendingPathComponent("trusted-devices.json") }
 
     private static func load() -> Set<String> {
         guard let data = try? Data(contentsOf: storeURL),
