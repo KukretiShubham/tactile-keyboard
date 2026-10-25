@@ -37,16 +37,20 @@ final class SocketServer {
     private let makeInput: () -> InputTarget
     private var clients: [ObjectIdentifier: Client] = [:]
 
-    /// - Parameter appPort: Port of the HTTPS page; only that page may connect.
-    init(port: UInt16, appPort: UInt16, tls: NWProtocolTLS.Options, pairing: Pairing, queue: DispatchQueue,
-         makeInput: @escaping () -> InputTarget) throws {
+    /// - Parameters:
+    ///   - appPort: Port of the page that serves the app; only that page may connect.
+    ///   - tls: Always set in normal use. Nil only for the dry-run development
+    ///     copy, which is also limited to this Mac (`loopbackOnly`).
+    init(port: UInt16, appPort: UInt16, tls: NWProtocolTLS.Options?, loopbackOnly: Bool = false,
+         pairing: Pairing, queue: DispatchQueue, makeInput: @escaping () -> InputTarget) throws {
+        let scheme = tls == nil ? "http" : "https"
         let options = NWProtocolWebSocket.Options()
         options.autoReplyPing = true
         options.maximumMessageSize = 16 * 1024
         options.setClientRequestHandler(queue) { _, headers in
             // Only the page this Mac serves may open the socket.
             let origin = headers.first { $0.name.caseInsensitiveCompare("Origin") == .orderedSame }?.value
-            let allowed = origin.map { Self.isAllowedOrigin($0, port: appPort) } ?? true
+            let allowed = origin.map { Self.isAllowedOrigin($0, scheme: scheme, port: appPort) } ?? true
             return NWProtocolWebSocket.Response(status: allowed ? .accept : .reject, subprotocol: nil, additionalHeaders: nil)
         }
 
@@ -56,7 +60,7 @@ final class SocketServer {
         let parameters = NWParameters(tls: tls, tcp: tcp)
         parameters.allowLocalEndpointReuse = true
         parameters.defaultProtocolStack.applicationProtocols.insert(options, at: 0)
-        listener = try NWListener(using: parameters, on: NWEndpoint.Port(rawValue: port)!)
+        listener = try NWListener.make(parameters, port: port, loopbackOnly: loopbackOnly)
 
         self.queue = queue
         self.pairing = pairing
@@ -207,8 +211,8 @@ final class SocketServer {
         return "\(host)".split(separator: "%").first.map(String.init) ?? "\(host)"
     }
 
-    private static func isAllowedOrigin(_ origin: String, port: UInt16) -> Bool {
-        guard let url = URL(string: origin), url.scheme == "https",
+    private static func isAllowedOrigin(_ origin: String, scheme: String, port: UInt16) -> Bool {
+        guard let url = URL(string: origin), url.scheme == scheme,
               let host = url.host?.lowercased(), url.port == Int(port) else { return false }
         return HostInfo.reachableHosts.contains(host)
     }

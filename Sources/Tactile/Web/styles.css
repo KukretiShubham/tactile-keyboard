@@ -251,7 +251,11 @@ html { touch-action: none; }
   padding: 14px max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
 }
 
-[data-layout="keyboard"] .stage { justify-content: center; }
+/* Keyboard position: with the trackpad, "bottom" docks the keys at the bottom
+   edge like the iPad's own keyboard; without it, the keys can also float mid-screen. */
+[data-layout="both"][data-position="bottom"] .deck { order: 2; }
+[data-layout="keyboard"][data-position="middle"] .stage { justify-content: center; }
+[data-layout="keyboard"][data-position="bottom"] .stage { justify-content: flex-end; }
 [data-layout="keyboard"] .trackpad,
 [data-layout="trackpad"] .deck { display: none; }
 
@@ -576,7 +580,7 @@ html { touch-action: none; }
   color: var(--text-2);
 }
 .group-footer { margin: 8px 16px 0; font-size: 13px; color: var(--text-2); }
-.group-footer:empty { display: none; }
+.group-footer:empty, .group-footer[hidden] { display: none; }
 
 .group {
   margin-top: 14px;
@@ -596,6 +600,7 @@ html { touch-action: none; }
   padding: 8px 16px;
   position: relative;
 }
+.group .row[hidden] { display: none; }
 .group .row + .row::before {
   content: "";
   position: absolute;

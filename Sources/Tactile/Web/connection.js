@@ -15,7 +15,9 @@ export class Connection extends EventTarget {
       const response = await fetch('config.json', { cache: 'no-store' });
       const { socketPort } = await response.json();
       const host = location.hostname.includes(':') ? `[${location.hostname}]` : location.hostname;
-      this.#url = `wss://${host}:${socketPort}`;
+      // Always wss:// in real use; ws:// only for the dry-run copy on this Mac.
+      const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
+      this.#url = `${scheme}://${host}:${socketPort}`;
       this.#open();
       this.#watch();
     } catch {

@@ -43,10 +43,12 @@ final class HTTPServer {
     /// - Parameters:
     ///   - tls: Serve HTTPS with these options, or plain HTTP when nil.
     ///   - policy: The page's Content-Security-Policy.
-    init(port: UInt16, tls: NWProtocolTLS.Options?, assets: [String: Asset], policy: String, queue: DispatchQueue) throws {
+    ///   - loopbackOnly: Accept connections from this Mac only.
+    init(port: UInt16, tls: NWProtocolTLS.Options?, assets: [String: Asset], policy: String,
+         loopbackOnly: Bool = false, queue: DispatchQueue) throws {
         let parameters = tls.map { NWParameters(tls: $0) } ?? .tcp
         parameters.allowLocalEndpointReuse = true
-        listener = try NWListener(using: parameters, on: NWEndpoint.Port(rawValue: port)!)
+        listener = try NWListener.make(parameters, port: port, loopbackOnly: loopbackOnly)
         self.assets = assets
         self.policy = policy
         self.queue = queue
@@ -114,5 +116,15 @@ final class HTTPServer {
         var response = Data(headers.utf8)
         if includeBody { response.append(body) }
         connection.send(content: response, completion: .contentProcessed { _ in connection.cancel() })
+    }
+}
+
+extension NWListener {
+    /// A listener on every interface, or only on 127.0.0.1.
+    static func make(_ parameters: NWParameters, port: UInt16, loopbackOnly: Bool) throws -> NWListener {
+        let port = NWEndpoint.Port(rawValue: port)!
+        guard loopbackOnly else { return try NWListener(using: parameters, on: port) }
+        parameters.requiredLocalEndpoint = .hostPort(host: .ipv4(.loopback), port: port)
+        return try NWListener(using: parameters)
     }
 }

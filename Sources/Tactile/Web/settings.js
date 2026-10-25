@@ -14,6 +14,10 @@ const DEFAULTS = {
   layout: 'both',
   keyHeight: 'standard',
   functionRow: true,
+  keyboardPosition: 'top',
+  keyboardSize: 'fit',
+  restFingers: true,
+  keepAwake: true,
 };
 
 export const storage = {

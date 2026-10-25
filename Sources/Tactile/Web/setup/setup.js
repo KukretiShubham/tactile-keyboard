@@ -1,6 +1,11 @@
 const status = document.getElementById('status');
 const openButton = document.getElementById('openButton');
 
+// The QR code's pairing code rides along after the "#", which browsers never
+// send over the network, so Tactile can pair without typing it.
+const pairing = /^#pair=\d{6}$/.test(location.hash) ? location.hash : '';
+if (location.hash) history.replaceState(null, '', location.pathname);
+
 const info = await fetch('/setup.json', { cache: 'no-store' }).then((response) => response.json());
 const localURL = `https://${location.hostname}:${info.appPort}/`;
 document.getElementById('fingerprint').textContent = info.fingerprint;
@@ -32,7 +37,7 @@ async function check() {
   const url = await bestAddress();
   if (!url) return;
   ready = true;
-  openButton.href = url;
+  openButton.href = url + pairing;
   status.textContent = url === info.tailscaleURL
     ? 'Connected through Tailscale. You’re all set.'
     : 'This iPad trusts your Mac. You’re all set.';
@@ -43,7 +48,7 @@ async function check() {
 
 // A returning iPad (or one on Tailscale) goes straight to the keyboard.
 const url = await bestAddress();
-if (url) location.replace(url);
+if (url) location.replace(url + pairing);
 
 setInterval(check, 2000);
 document.addEventListener('visibilitychange', check);

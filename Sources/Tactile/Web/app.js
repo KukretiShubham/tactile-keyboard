@@ -17,7 +17,14 @@ const connection = new Connection();
 const feedback = new Feedback(settings);
 const send = (message) => connection.send(message);
 
-const keyboard = createKeyboard(document.getElementById('keyboard'), { send, feedback });
+// A QR code from the Mac carries the pairing code after the "#", which never
+// leaves the iPad. Take it out of the address right away so it isn't saved in
+// history or in a Home Screen bookmark.
+const pairingLink = new URLSearchParams(location.hash.slice(1)).get('pair');
+if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+let pairingLinkUsed = false;
+
+const keyboard = createKeyboard(document.getElementById('keyboard'), { send, feedback, settings });
 const trackpad = createTrackpad(document.getElementById('trackpad'), {
   send, feedback, settings,
   onClick: () => keyboard.releaseLatched(),
@@ -40,8 +47,11 @@ function applySkin() {
 function fit() {
   const layout = settings.get('layout');
   const functionRow = settings.get('functionRow');
+  const expanded = layout === 'keyboard' && settings.get('keyboardSize') === 'expanded';
   app.dataset.layout = layout;
   app.dataset.functionRow = functionRow ? 'on' : 'off';
+  app.dataset.position = settings.get('keyboardPosition');
+  app.dataset.size = expanded ? 'expanded' : 'fit';
   const style = getComputedStyle(stage);
   const width = stage.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
   const height = stage.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
@@ -58,8 +68,16 @@ function fit() {
   const unitFromHeight = (keyboardHeight - 2 * pad - rowGaps * gap) / (rows * keyHeightRatio);
   const unit = Math.max(20, Math.floor(Math.min(unitFromWidth, unitFromHeight) * 10) / 10);
 
+  // Expanded: keys grow taller to fill the screen (up to 2.2× their width),
+  // so there's more to aim at when the trackpad is hidden.
+  let keyHeight = unit * keyHeightRatio;
+  if (expanded) {
+    const fill = (height - 2 * pad - rowGaps * gap) / rows;
+    keyHeight = Math.min(Math.max(keyHeight, fill), unit * 2.2);
+  }
+
   root.style.setProperty('--u', `${unit}px`);
-  root.style.setProperty('--kh', `${(unit * keyHeightRatio).toFixed(1)}px`);
+  root.style.setProperty('--kh', `${keyHeight.toFixed(1)}px`);
   root.style.setProperty('--g', `${gap.toFixed(1)}px`);
   root.style.setProperty('--deck-pad', `${pad.toFixed(1)}px`);
   root.style.setProperty('--stage-gap', `${stageGap.toFixed(1)}px`);
@@ -67,7 +85,8 @@ function fit() {
 
 settings.subscribe((key) => {
   if (key === 'skin' || key === 'glow') applySkin();
-  if (key === 'layout' || key === 'keyHeight' || key === 'functionRow') fit();
+  if (['layout', 'keyHeight', 'functionRow', 'keyboardPosition', 'keyboardSize'].includes(key)) fit();
+  if (key === 'keepAwake') keepAwake();
 });
 prefersDark.addEventListener('change', applySkin);
 new ResizeObserver(fit).observe(stage);
@@ -79,14 +98,47 @@ const LABELS = { connecting: 'Connecting…', pairing: 'Waiting to pair', offlin
 connection.addEventListener('state', ({ detail: state }) => {
   status.dataset.state = state;
   statusLabel.textContent = state === 'ready' ? connection.macName : LABELS[state];
-  if (state === 'pairing') sheets.showPairing();
+  if (state === 'pairing') {
+    if (pairingLink && !pairingLinkUsed) {
+      pairingLinkUsed = true;
+      connection.pair(pairingLink);
+    } else {
+      sheets.showPairing();
+    }
+  }
   if (state === 'ready') sheets.hidePairing();
   if (state !== 'ready') {
     keyboard.reset();
     trackpad.reset();
   }
 });
-connection.addEventListener('denied', ({ detail }) => sheets.pairingDenied(detail));
+connection.addEventListener('denied', ({ detail }) => {
+  // A scanned code that no longer works (Tactile restarted, or another iPad
+  // used it) falls back to typing the current code.
+  sheets.showPairing();
+  sheets.pairingDenied(pairingLinkUsed && detail === 'code' ? 'expired' : detail);
+});
+
+// Keep the screen on while Tactile is open, so the iPad doesn't dim mid-sentence
+// and the connection doesn't drop. Safari releases the lock when the page is
+// hidden, so it's requested again whenever the page comes back.
+let wakeLock = null;
+async function keepAwake() {
+  if (!settings.get('keepAwake')) {
+    await wakeLock?.release();
+    wakeLock = null;
+    return;
+  }
+  if (document.hidden || !('wakeLock' in navigator) || (wakeLock && !wakeLock.released)) return;
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+  } catch {
+    // Refused (for example in Low Power Mode); the iPad just sleeps as usual.
+  }
+}
+document.addEventListener('visibilitychange', keepAwake);
+window.addEventListener('pointerdown', keepAwake, { capture: true });
+keepAwake();
 
 // Audio can only start from a touch.
 window.addEventListener('pointerdown', () => feedback.unlock(), { capture: true });

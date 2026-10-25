@@ -45,7 +45,7 @@ The first run asks for **Accessibility** access. Allow the app you started Tacti
 | Flag | Effect |
 |---|---|
 | `--port 8420` | Setup page port (plain HTTP). The app uses +1/+2 with the local certificate and +3/+4 with the Tailscale certificate (HTTPS page and secure WebSocket). |
-| `--dry-run` | Prints input instead of sending it to the Mac. Useful while working on the UI. |
+| `--dry-run` | Prints input instead of sending it to the Mac. Also serves a plain-HTTP copy of the app at `http://127.0.0.1:<port+5>`, reachable only from this Mac, for trying UI changes in a desktop browser. |
 | `--no-tailscale` | Don't ask Tailscale for a certificate. |
 | `--forget-devices` | Removes every paired iPad. |
 
@@ -61,6 +61,14 @@ The first run asks for **Accessibility** access. Allow the app you started Tacti
 | Compose button (top right) | Type with the iPad's own keyboard, so dictation, emoji and autocorrect work |
 
 A hardware keyboard attached to the iPad is passed through to the Mac too.
+
+Other settings (gear button, top right):
+
+- **Pairing:** scanning the QR code in Terminal also pairs the iPad, so there's no code to type. Each code works once; Terminal shows a new QR and code after every pairing.
+- **Rest Fingers on Keys** (on by default): keys type when you lift your finger, so fingers resting on the keys don't type. If you roll from one key to the next, the letters still come out in the order you pressed them. Delete and the arrow keys still repeat when held.
+- **Keyboard Position:** Top or Bottom with the trackpad (Bottom docks the keys like the iPad's own keyboard). In keyboard-only layout, Middle is also available.
+- **Keyboard Size:** in keyboard-only layout, **Expanded** makes the keys taller to fill the screen.
+- **Keep Screen Awake** (on by default): the iPad doesn't dim or sleep while Tactile is open.
 
 ## How it works
 

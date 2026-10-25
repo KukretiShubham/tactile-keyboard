@@ -65,6 +65,9 @@ const NO_REPEAT = new Set(['Escape', 'Enter', 'Tab']);
 const REPEAT_DELAY = 450;
 const REPEAT_INTERVAL = 55;
 const DOUBLE_TAP = 350;
+// With "Rest Fingers on Keys", a touch held longer than this is a resting
+// finger, not a keystroke.
+const REST_TIME = 350;
 
 function soundKind(def) {
   if (def.kind === 'space') return 'space';
@@ -131,12 +134,20 @@ function renderKey(def) {
  * iPad's own keyboard: hold for a chord, tap to apply to the next key,
  * double-tap to lock.
  */
-export function createKeyboard(root, { send, feedback }) {
+export function createKeyboard(root, { send, feedback, settings }) {
   const defs = new WeakMap();
   const elements = new Map();
   const presses = new Map(); // pointerId → active press
   const mods = new Map(); // code → { state: 'held' | 'latched' | 'locked', used, tappedAt }
   let capsLock = false;
+  let pressOrder = 0;
+
+  // Typing keys wait for the finger to lift; delete and arrows stay immediate
+  // so holding them still repeats.
+  const typesOnLift = (def) =>
+    settings.get('restFingers') &&
+    ['letter', 'pair', 'space', 'word'].includes(def.kind) &&
+    def.code !== 'Backspace';
 
   for (const [index, row] of ROWS.entries()) {
     const rowEl = document.createElement('div');
@@ -212,7 +223,7 @@ export function createKeyboard(root, { send, feedback }) {
     }
   }
 
-  function keyDown(def) {
+  function keyDown(def, { repeat = true } = {}) {
     for (const mod of mods.values()) mod.used = true;
 
     if (def.sys && !fnActive()) {
@@ -225,7 +236,7 @@ export function createKeyboard(root, { send, feedback }) {
     send({ t: 'kd', k: code });
 
     const press = { code, addShift };
-    if (!NO_REPEAT.has(code) && def.kind !== 'fkey') {
+    if (repeat && !NO_REPEAT.has(code) && def.kind !== 'fkey') {
       press.delay = setTimeout(() => {
         press.repeat = setInterval(() => send({ t: 'kd', k: code, r: true }), REPEAT_INTERVAL);
       }, REPEAT_DELAY);
@@ -239,6 +250,25 @@ export function createKeyboard(root, { send, feedback }) {
     send({ t: 'ku', k: press.code });
     if (press.addShift) send({ t: 'ku', k: 'ShiftLeft' });
     releaseLatched();
+  }
+
+  // Types a key that was waiting for its finger to lift.
+  function commit(press) {
+    press.committed = true;
+    feedback.key(soundKind(press.deferred));
+    const sent = keyDown(press.deferred, { repeat: false });
+    if (sent.code) keyUp(sent);
+    else releaseLatched();
+  }
+
+  // When fingers roll from one key to the next, the earlier key can lift
+  // second. Type any shorter-held keys pressed before this one first, so
+  // letters come out in the order they were pressed.
+  function commitEarlier(press, now) {
+    const earlier = [...presses.values()]
+      .filter((other) => other.deferred && !other.committed && other.order < press.order && now - other.at < REST_TIME)
+      .sort((a, b) => a.order - b.order);
+    earlier.forEach(commit);
   }
 
   // A touch in the gap between keys (or on the frame) goes to the closest key,
@@ -268,9 +298,14 @@ export function createKeyboard(root, { send, feedback }) {
     event.preventDefault();
     try { el.setPointerCapture(event.pointerId); } catch { /* touch already ended */ }
     const def = defs.get(el);
-    feedback.key(soundKind(def));
     el.classList.add('pressed');
 
+    if (typesOnLift(def)) {
+      presses.set(event.pointerId, { el, deferred: def, at: performance.now(), order: ++pressOrder });
+      return;
+    }
+
+    feedback.key(soundKind(def));
     let press;
     if (def.kind === 'mod') {
       modifierDown(def);
@@ -290,7 +325,13 @@ export function createKeyboard(root, { send, feedback }) {
     if (!press) return;
     presses.delete(event.pointerId);
     press.el.classList.remove('pressed');
-    if (press.modifier) modifierUp(press.modifier);
+    if (press.deferred) {
+      const now = performance.now();
+      if (!press.committed && event.type === 'pointerup' && now - press.at < REST_TIME) {
+        commitEarlier(press, now);
+        commit(press);
+      }
+    } else if (press.modifier) modifierUp(press.modifier);
     else if (press.code) keyUp(press);
     else if (!press.el.classList.contains('key-caps')) releaseLatched();
   };

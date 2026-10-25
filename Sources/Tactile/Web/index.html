@@ -76,8 +76,9 @@
             </div>
           </div>
           <label class="row"><span class="row-label">Function Row</span><input type="checkbox" class="switch" data-setting="functionRow"></label>
+          <label class="row"><span class="row-label">Rest Fingers on Keys</span><input type="checkbox" class="switch" data-setting="restFingers"></label>
         </div>
-        <p class="group-footer">Hiding the function row leaves more room for taller keys.</p>
+        <p class="group-footer">With Rest Fingers on, keys type when you lift your finger, so fingers resting on the keys don't type. Delete and the arrow keys still repeat when held.</p>
 
         <h3 class="group-title">Feedback</h3>
         <div class="group">
@@ -107,7 +108,21 @@
               <button data-value="both">Both</button><button data-value="keyboard">Keyboard</button><button data-value="trackpad">Trackpad</button>
             </div>
           </div>
+          <div class="row" id="positionRow">
+            <span class="row-label">Keyboard Position</span>
+            <div class="segmented" data-setting="keyboardPosition">
+              <button data-value="top">Top</button><button data-value="middle">Middle</button><button data-value="bottom">Bottom</button>
+            </div>
+          </div>
+          <div class="row" id="sizeRow">
+            <span class="row-label">Keyboard Size</span>
+            <div class="segmented" data-setting="keyboardSize">
+              <button data-value="fit">Fit</button><button data-value="expanded">Expanded</button>
+            </div>
+          </div>
+          <label class="row"><span class="row-label">Keep Screen Awake</span><input type="checkbox" class="switch" data-setting="keepAwake"></label>
         </div>
+        <p class="group-footer" id="sizeNote">Expanded makes the keys taller to fill the screen when the trackpad is hidden.</p>
 
         <div class="group">
           <button class="row row-button destructive" id="forgetButton">Forget This iPad</button>

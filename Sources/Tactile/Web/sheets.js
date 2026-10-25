@@ -119,6 +119,13 @@ export function setupSheets({ connection, feedback }) {
     });
     const glowing = document.documentElement.dataset.skin === 'midnight';
     document.getElementById('glowGroup').hidden = !glowing;
+
+    // Only offer what applies to the current layout.
+    const layout = settings.get('layout');
+    document.getElementById('positionRow').hidden = layout === 'trackpad';
+    document.getElementById('sizeRow').hidden = layout !== 'keyboard';
+    document.getElementById('sizeNote').hidden = layout !== 'keyboard';
+    settingsSheet.querySelector('[data-setting="keyboardPosition"] [data-value="middle"]').hidden = layout !== 'keyboard';
   }
   settings.subscribe(sync);
   sync();
@@ -187,9 +194,10 @@ export function setupSheets({ connection, feedback }) {
     },
     pairingDenied(reason) {
       pairCode.value = '';
-      pairError.textContent = reason === 'locked'
-        ? 'Too many tries. Wait a minute, then try again.'
-        : "That code didn't match. Check Terminal on your Mac.";
+      pairError.textContent = {
+        locked: 'Too many tries. Wait a minute, then try again.',
+        expired: 'That QR code has expired. Enter the code shown in Terminal now.',
+      }[reason] ?? "That code didn't match. Check Terminal on your Mac.";
     },
   };
 }

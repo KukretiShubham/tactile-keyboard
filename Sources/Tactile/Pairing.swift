@@ -5,7 +5,11 @@ import Security
 /// Pairs iPads with a one-time code and remembers them with long random tokens.
 /// Only SHA-256 hashes of tokens are stored on disk.
 final class Pairing {
-    let code: String
+    /// Single use: a new code replaces it as soon as an iPad pairs, so a code
+    /// seen on screen or in a scanned link can't be used again.
+    private(set) var code = Pairing.newCode()
+    /// Called after the code changes, so the new one can be shown.
+    var onNewCode: (() -> Void)?
 
     private var trusted: Set<String>
     private var failures: [String: (count: Int, lockedUntil: Date?)] = [:]
@@ -13,7 +17,6 @@ final class Pairing {
     private let lockDuration: TimeInterval = 60
 
     init() {
-        code = (0..<6).map { _ in String(Int.random(in: 0...9)) }.joined()
         // Tokens issued before HTTPS existed crossed the network unencrypted.
         try? FileManager.default.removeItem(at: Self.legacyStoreURL)
         trusted = Self.load()
@@ -39,6 +42,8 @@ final class Pairing {
             let token = Self.randomToken()
             trusted.insert(Self.hash(token))
             save()
+            code = Self.newCode()
+            onNewCode?()
             return token
         }
         var entry = failures[address] ?? (0, nil)
@@ -48,6 +53,10 @@ final class Pairing {
         }
         failures[address] = entry
         return nil
+    }
+
+    private static func newCode() -> String {
+        (0..<6).map { _ in String(Int.random(in: 0...9)) }.joined()
     }
 
     static func forgetAll() {

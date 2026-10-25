@@ -82,23 +82,31 @@ setupAssets["/tactile-ca.crt"] = HTTPServer.Asset(body: local.caDER, type: "appl
 let basePolicy = "default-src 'self'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'"
 let makeInput = { dryRun ? LoggingInput() as InputTarget : InputSession() }
 
-/// The keyboard page and its socket, served with one certificate.
-func secureApp(_ identity: TLSIdentity, ports: (app: UInt16, socket: UInt16)) throws -> (HTTPServer, SocketServer) {
+/// The keyboard page and its socket, served with one certificate. Without a
+/// certificate (dry-run development copy only) both listen on 127.0.0.1 alone.
+func appServers(_ identity: TLSIdentity?, ports: (app: UInt16, socket: UInt16)) throws -> (HTTPServer, SocketServer) {
     var pageAssets = appAssets
     pageAssets["/config.json"] = HTTPServer.json(["socketPort": Int(ports.socket)])
-    let page = try HTTPServer(port: ports.app, tls: identity.options(), assets: pageAssets,
-                              policy: "\(basePolicy); connect-src 'self' wss:", queue: queue)
-    let socket = try SocketServer(port: ports.socket, appPort: ports.app, tls: identity.options(),
-                                  pairing: pairing, queue: queue, makeInput: makeInput)
+    let loopbackOnly = identity == nil
+    let page = try HTTPServer(port: ports.app, tls: identity?.options(), assets: pageAssets,
+                              policy: "\(basePolicy); connect-src 'self' \(loopbackOnly ? "ws:" : "wss:")",
+                              loopbackOnly: loopbackOnly, queue: queue)
+    let socket = try SocketServer(port: ports.socket, appPort: ports.app, tls: identity?.options(),
+                                  loopbackOnly: loopbackOnly, pairing: pairing, queue: queue, makeInput: makeInput)
     return (page, socket)
 }
+
+let devPorts = (app: setupPort + 5, socket: setupPort + 6)
 
 let servers: (pages: [HTTPServer], sockets: [SocketServer]) = {
     do {
         let setup = try HTTPServer(port: setupPort, tls: nil, assets: setupAssets,
                                    policy: "\(basePolicy); connect-src 'self' https:", queue: queue)
-        var apps = [try secureApp(local.identity, ports: localPorts)]
-        if let tailscale { apps.append(try secureApp(tailscale.identity, ports: tailscalePorts)) }
+        var apps = [try appServers(local.identity, ports: localPorts)]
+        if let tailscale { apps.append(try appServers(tailscale.identity, ports: tailscalePorts)) }
+        // Lets a browser on this Mac try the UI without trusting the certificate.
+        // Input is only logged in a dry run, so nothing here can control the Mac.
+        if dryRun { apps.append(try appServers(nil, ports: devPorts)) }
         return ([setup] + apps.map(\.0), apps.map(\.1))
     } catch {
         fputs("Could not start Tactile: \(error)\n", stderr)
@@ -108,8 +116,17 @@ let servers: (pages: [HTTPServer], sockets: [SocketServer]) = {
 
 servers.pages.forEach { $0.start() }
 servers.sockets.forEach { $0.start() }
-Banner.show(setupPort: setupPort, appPort: localPorts.app, tailscaleURL: tailscaleURL,
-            code: pairing.code, fingerprint: local.fingerprint, dryRun: dryRun)
+
+func showBanner() {
+    Banner.show(setupPort: setupPort, appPort: localPorts.app, tailscaleURL: tailscaleURL,
+                code: pairing.code, fingerprint: local.fingerprint, dryRun: dryRun)
+}
+showBanner()
+if dryRun { print("  Dry-run page for this Mac only: http://127.0.0.1:\(devPorts.app)\n") }
+pairing.onNewCode = {
+    Log.info("That pairing code is used up. Here's a new one for the next iPad:")
+    showBanner()
+}
 
 signal(SIGINT, SIG_IGN)
 signal(SIGTERM, SIG_IGN)

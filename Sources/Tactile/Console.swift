@@ -67,7 +67,8 @@ enum Banner {
         print("")
         print("  \(bold)Tactile is running\(reset) 🔒\(dryRun ? "  \(dim)(dry run — input is only logged)\(reset)" : "")")
         print("")
-        qrLines(for: setupURL).forEach { print("  \($0)") }
+        // Scanning pairs too: the code rides after "#", which never leaves the iPad.
+        qrLines(for: "\(setupURL)/#pair=\(code)").forEach { print("  \($0)") }
         print("")
         if let tailscaleURL {
             print("  With Tailscale      \(bold)\(tailscaleURL)\(reset)")
