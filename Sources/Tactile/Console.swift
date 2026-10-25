@@ -44,16 +44,20 @@ enum HostInfo {
         return found.sorted { $0.name.hasPrefix("en") && !$1.name.hasPrefix("en") }.map(\.address)
     }
 
+    /// This Mac's tailnet name, when Tactile has a Tailscale certificate for it.
+    static var tailscaleName: String?
+
     static var reachableHosts: Set<String> {
         var hosts: Set<String> = ["localhost", "127.0.0.1"]
         hosts.formUnion(ipv4Addresses)
         if let name = bonjourName { hosts.insert(name.lowercased()) }
+        if let name = tailscaleName { hosts.insert(name.lowercased()) }
         return hosts
     }
 }
 
 enum Banner {
-    static func show(setupPort: UInt16, appPort: UInt16, code: String, fingerprint: String, dryRun: Bool) {
+    static func show(setupPort: UInt16, appPort: UInt16, tailscaleURL: String?, code: String, fingerprint: String, dryRun: Bool) {
         let hosts = [HostInfo.bonjourName].compactMap { $0 } + HostInfo.ipv4Addresses
         let host = hosts.first ?? "localhost"
         let setupURL = "http://\(host):\(setupPort)"
@@ -65,9 +69,16 @@ enum Banner {
         print("")
         qrLines(for: setupURL).forEach { print("  \($0)") }
         print("")
+        if let tailscaleURL {
+            print("  With Tailscale      \(bold)\(tailscaleURL)\(reset)")
+            print("  \(dim)(iPads running Tailscale open this directly — no certificate setup)\(reset)")
+            print("")
+        }
         print("  Open on your iPad   \(bold)\(setupURL)\(reset)")
         hosts.dropFirst().forEach { print("                      http://\($0):\(setupPort)") }
-        print("  \(dim)(It installs this Mac's certificate once, then opens https://\(host):\(appPort))\(reset)")
+        print(tailscaleURL == nil
+              ? "  \(dim)(It installs this Mac's certificate once, then opens https://\(host):\(appPort))\(reset)"
+              : "  \(dim)(Goes to Tailscale when it can; otherwise sets up this Mac's certificate once)\(reset)")
         print("  Pairing code        \(bold)\(spacedCode)\(reset)")
         print("")
         print("  Certificate SHA-256 \(fingerprint.prefix(47))")

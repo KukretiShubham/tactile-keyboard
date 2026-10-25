@@ -16,7 +16,19 @@ Requires macOS 15 or later and the Swift toolchain (Xcode or Command Line Tools)
 swift run -c release Tactile
 ```
 
-Or double-click `start-tactile.command`. Terminal shows a QR code, the setup address, a six-digit pairing code and the certificate fingerprint. On the iPad:
+Or double-click `start-tactile.command`. Terminal shows a QR code, the setup address, a six-digit pairing code and the certificate fingerprint.
+
+### Fastest: Tailscale (no certificate setup)
+
+If the Mac and iPad are both on [Tailscale](https://tailscale.com), Tactile uses a real, publicly trusted HTTPS certificate for the Mac's tailnet name, so there's nothing to install on the iPad.
+
+1. In the Tailscale admin console, turn on **MagicDNS** and **HTTPS Certificates** (https://login.tailscale.com/admin/dns). This is a one-time step.
+2. Start Tactile. It asks Tailscale for a certificate at launch and prints a **With Tailscale** address, for example `https://your-mac.your-tailnet.ts.net:8423`.
+3. On the iPad, with Tailscale on, open that address (or the setup page, which redirects there) and enter the pairing code.
+
+This works away from home too. Note that public certificates are recorded in public Certificate Transparency logs, so your Mac's tailnet name becomes publicly visible.
+
+### Without Tailscale: trust the Mac's certificate once
 
 1. Scan the QR code, or type the address, to open the setup page in Safari.
 2. **Once per iPad**, the setup page walks you through trusting your Mac's certificate:
@@ -32,8 +44,9 @@ The first run asks for **Accessibility** access. Allow the app you started Tacti
 
 | Flag | Effect |
 |---|---|
-| `--port 8420` | Setup page port (plain HTTP). The app uses the next port (HTTPS) and the one after that (secure WebSocket). |
+| `--port 8420` | Setup page port (plain HTTP). The app uses +1/+2 with the local certificate and +3/+4 with the Tailscale certificate (HTTPS page and secure WebSocket). |
 | `--dry-run` | Prints input instead of sending it to the Mac. Useful while working on the UI. |
+| `--no-tailscale` | Don't ask Tailscale for a certificate. |
 | `--forget-devices` | Removes every paired iPad. |
 
 ## Using it
@@ -55,7 +68,8 @@ A hardware keyboard attached to the iPad is passed through to the Mac too.
 iPad Safari ── TLS: HTTPS + secure WebSocket (JSON) ──▶ Tactile (Swift) ──▶ CGEvent ──▶ macOS
 ```
 
-- `Sources/Tactile/TLSIdentity.swift` keeps this Mac's private certificate authority (CA) and issues a fresh HTTPS certificate on every launch for the Mac's current name and addresses.
+- `Sources/Tactile/Tailscale.swift` asks Tailscale for a Let's Encrypt certificate for the Mac's tailnet name, when HTTPS certificates are enabled for the tailnet.
+- `Sources/Tactile/TLSIdentity.swift` keeps this Mac's private certificate authority (CA), the fallback, and issues a fresh HTTPS certificate on every launch for the Mac's current name and addresses.
 - `Sources/Tactile/HTTPServer.swift` serves files from memory, so only the bundled files can be requested. The app is served over HTTPS; plain HTTP serves only the setup page (`Web/setup/`) and the CA certificate.
 - `Sources/Tactile/SocketServer.swift` handles pairing and input. It accepts sockets only from this Mac's own page, and every iPad gets its own input session, so keys are released if it disconnects.
 - `Sources/Tactile/InputSession.swift` turns messages into real key, mouse, scroll and media-key events.
