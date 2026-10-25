@@ -5,6 +5,7 @@
 //
 // The frame is stored per orientation as fractions of the available space:
 // { cx, cy } for the centre and w for the width.
+import { clamp, contentBox, el } from './util.js';
 
 const DEFAULT_FRAME = { cx: 0.5, cy: 0.6, w: 0.75 };
 const SNAP = 18;
@@ -13,17 +14,15 @@ const DOUBLE_TAP = 300;
 export const HANDLE_SPACE = 40;
 
 export function createFloating({ deck, settings, feedback, onLiveFrame, minWidth }) {
-  const handle = document.createElement('div');
-  handle.className = 'float-handle';
-  handle.setAttribute('role', 'button');
-  handle.setAttribute('aria-label', 'Move keyboard. Double-tap to reset.');
-  handle.append(document.createElement('span'));
-
-  const grip = document.createElement('div');
-  grip.className = 'float-grip';
-  grip.setAttribute('role', 'button');
-  grip.setAttribute('aria-label', 'Resize keyboard');
-  grip.innerHTML = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M17 7 7 17M17 12l-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+  const handle = el('div', {
+    className: 'float-handle',
+    attrs: { role: 'button', 'aria-label': 'Move keyboard. Double-tap to reset.' },
+  }, el('span'));
+  const grip = el('div', {
+    className: 'float-grip',
+    attrs: { role: 'button', 'aria-label': 'Resize keyboard' },
+    html: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M17 7 7 17M17 12l-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+  });
 
   deck.append(handle, grip);
 
@@ -37,22 +36,8 @@ export function createFloating({ deck, settings, feedback, onLiveFrame, minWidth
     settings.set('floatingFrame', { ...(settings.get('floatingFrame') ?? {}), [orientation()]: next });
   }
 
-  /** The stage's inner box (in viewport coordinates), which frames are measured against. */
-  function bounds() {
-    const stage = deck.parentElement;
-    const style = getComputedStyle(stage);
-    const r = stage.getBoundingClientRect();
-    const left = r.left + parseFloat(style.paddingLeft);
-    const top = r.top + parseFloat(style.paddingTop);
-    return {
-      left,
-      top,
-      width: r.width - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight),
-      height: r.height - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom),
-    };
-  }
-
-  const clamp = (value, low, high) => Math.min(Math.max(value, low), Math.max(low, high));
+  // Frames are measured against the stage's inner box.
+  const bounds = () => contentBox(deck.parentElement);
 
   // One gesture at a time: moving (handle) or resizing (grip).
   let gesture = null;
@@ -152,11 +137,11 @@ export function createFloating({ deck, settings, feedback, onLiveFrame, minWidth
 
   handle.addEventListener('pointerdown', (event) => begin('move', event));
   grip.addEventListener('pointerdown', (event) => begin('resize', event));
-  for (const el of [handle, grip]) {
-    el.addEventListener('pointermove', move);
-    el.addEventListener('pointerup', end);
-    el.addEventListener('pointercancel', end);
+  for (const control of [handle, grip]) {
+    control.addEventListener('pointermove', move);
+    control.addEventListener('pointerup', end);
+    control.addEventListener('pointercancel', end);
   }
 
-  return { frame, bounds };
+  return { frame };
 }

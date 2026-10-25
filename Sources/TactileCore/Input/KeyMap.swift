@@ -1,8 +1,8 @@
 import CoreGraphics
 
 /// Maps W3C `KeyboardEvent.code` names to macOS virtual key codes (ANSI layout).
-enum KeyMap {
-    static let codes: [String: CGKeyCode] = [
+public enum KeyMap {
+    public static let codes: [String: CGKeyCode] = [
         "KeyA": 0x00, "KeyS": 0x01, "KeyD": 0x02, "KeyF": 0x03, "KeyH": 0x04, "KeyG": 0x05,
         "KeyZ": 0x06, "KeyX": 0x07, "KeyC": 0x08, "KeyV": 0x09, "KeyB": 0x0B, "KeyQ": 0x0C,
         "KeyW": 0x0D, "KeyE": 0x0E, "KeyR": 0x0F, "KeyY": 0x10, "KeyT": 0x11, "KeyO": 0x1F,
@@ -26,6 +26,14 @@ enum KeyMap {
         "F1": 0x7A, "F2": 0x78, "F3": 0x63, "F4": 0x76, "F5": 0x60, "F6": 0x61,
         "F7": 0x62, "F8": 0x64, "F9": 0x65, "F10": 0x6D, "F11": 0x67, "F12": 0x6F,
     ]
+
+    /// Keys that type a character, whose labels follow the Mac's keyboard layout.
+    public static var characterKeys: [String] {
+        codes.keys.filter { $0.hasPrefix("Key") || $0.hasPrefix("Digit") || punctuation.contains($0) }.sorted()
+    }
+
+    private static let punctuation: Set = ["Equal", "Minus", "BracketRight", "BracketLeft", "Quote", "Semicolon",
+                                           "Backslash", "Comma", "Slash", "Period", "Backquote", "IntlBackslash"]
 
     static let modifierFlags: [CGKeyCode: CGEventFlags] = [
         0x37: .maskCommand, 0x36: .maskCommand,

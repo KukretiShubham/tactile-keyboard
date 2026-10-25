@@ -3,37 +3,37 @@ import Foundation
 /// Everything Tactile runs: certificates, the setup page, the secure app and
 /// socket servers, and pairing. The menu bar and the Terminal banner both drive
 /// it and watch it; all of its own work happens on one serial queue.
-final class TactileService {
-    struct Snapshot {
-        var running: Bool
+public final class TactileService {
+    public struct Snapshot {
+        public var running: Bool
         /// Paused from the menu or the shortcut.
-        var paused: Bool
+        public var paused: Bool
         /// Paused because the Mac is locked (and that option is on).
-        var lockPaused: Bool
-        var dryRun: Bool
-        var usesTailscale: Bool
+        public var lockPaused: Bool
+        public var dryRun: Bool
+        public var usesTailscale: Bool
         /// Over Tailscale, only devices signed in as this Mac's owner get in.
-        var onlyMyDevices: Bool
-        var code: String
-        var setupURLs: [String]
-        var pairingLink: String
-        var localURL: String
-        var tailscaleURL: String?
-        var fingerprint: String
-        var devices: [Pairing.Device]
-        var connected: Set<String>
+        public var onlyMyDevices: Bool
+        public var code: String
+        public var setupURLs: [String]
+        public var pairingLink: String
+        public var localURL: String
+        public var tailscaleURL: String?
+        public var fingerprint: String
+        public var devices: [Pairing.Device]
+        public var connected: Set<String>
         /// Devices disconnected from the menu, kept off until reconnected.
-        var held: Set<String>
+        public var held: Set<String>
         /// Round-trip time to each connected device, in milliseconds.
-        var latency: [String: Int]
+        public var latency: [String: Int]
         /// When each device last sent input.
-        var lastInput: [String: Date]
-        var tailscaleExpiry: Date?
-        var portsSummary: String
-        var setupHost: String
+        public var lastInput: [String: Date]
+        public var tailscaleExpiry: Date?
+        public var portsSummary: String
+        public var setupHost: String
     }
 
-    enum Event {
+    public enum Event {
         case started
         case newCode
         case paired(Pairing.Device)
@@ -61,6 +61,7 @@ final class TactileService {
     private var lastActivityPublish = Date.distantPast
     private var tailscaleExpiry: Date?
     private var lastActive: [String: Date] = [:]
+    private var keyboardLabels: [String: [String]] = [:]
 
     private var stateObservers: [(Snapshot) -> Void] = []
     private var eventObservers: [(Event) -> Void] = []
@@ -70,7 +71,7 @@ final class TactileService {
     private var devPorts: (app: UInt16, socket: UInt16) { (setupPort + 5, setupPort + 6) }
     private let basePolicy = "default-src 'self'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'"
 
-    init(webRoot: URL, setupPort: UInt16, dryRun: Bool, useTailscale: Bool, onlyMyDevices: Bool = true) {
+    public init(webRoot: URL, setupPort: UInt16, dryRun: Bool, useTailscale: Bool, onlyMyDevices: Bool = true) {
         assets = HTTPServer.loadAssets(from: webRoot)
         self.setupPort = setupPort
         self.dryRun = dryRun
@@ -85,11 +86,11 @@ final class TactileService {
 
     // MARK: Observing (callbacks arrive on the main queue)
 
-    func observe(_ handler: @escaping (Snapshot) -> Void) {
+    public func observe(_ handler: @escaping (Snapshot) -> Void) {
         queue.async { self.stateObservers.append(handler) }
     }
 
-    func observeEvents(_ handler: @escaping (Event) -> Void) {
+    public func observeEvents(_ handler: @escaping (Event) -> Void) {
         queue.async { self.eventObservers.append(handler) }
     }
 
@@ -137,13 +138,13 @@ final class TactileService {
 
     // MARK: Controls
 
-    func start() { queue.async { self.startNow() } }
-    func stop() { queue.async { self.stopNow() } }
+    public func start() { queue.async { self.startNow() } }
+    public func stop() { queue.async { self.stopNow() } }
 
     /// Stops right away, for quitting.
-    func stopAndWait() { queue.sync { self.stopNow() } }
+    public func stopAndWait() { queue.sync { self.stopNow() } }
 
-    func setPaused(_ value: Bool) {
+    public func setPaused(_ value: Bool) {
         queue.async {
             self.paused = value
             if value { self.sockets.forEach { $0.releaseAllInput() } }
@@ -153,7 +154,7 @@ final class TactileService {
     }
 
     /// Pauses input while the Mac is locked, separately from the manual pause.
-    func setLockPaused(_ value: Bool) {
+    public func setLockPaused(_ value: Bool) {
         queue.async {
             guard self.lockPaused != value else { return }
             self.lockPaused = value
@@ -165,7 +166,7 @@ final class TactileService {
 
     /// Disconnects a device and keeps it off (it would otherwise reconnect
     /// straight away) until `reconnect` or the next start.
-    func disconnect(_ id: String) {
+    public func disconnect(_ id: String) {
         queue.async {
             self.held.insert(id)
             self.sockets.forEach { $0.disconnect(deviceID: id) }
@@ -174,7 +175,7 @@ final class TactileService {
         }
     }
 
-    func reconnect(_ id: String) {
+    public func reconnect(_ id: String) {
         queue.async {
             self.held.remove(id)
             self.publish()
@@ -183,7 +184,7 @@ final class TactileService {
 
     /// Lets only the Mac owner's devices connect over Tailscale (checked when
     /// each connection opens).
-    func setOnlyMyDevices(_ value: Bool) {
+    public func setOnlyMyDevices(_ value: Bool) {
         queue.async {
             self.onlyMyDevices = value
             Log.info(value ? "Only your own Tailscale devices can connect." : "Any device on the tailnet can try to pair.")
@@ -191,7 +192,17 @@ final class TactileService {
         }
     }
 
-    func setUseTailscale(_ value: Bool) {
+    /// What each key types on the Mac's current layout (read on the main
+    /// thread by the app); sent to devices so their key labels match.
+    public func setKeyboardLabels(_ labels: [String: [String]]) {
+        queue.async {
+            guard self.keyboardLabels != labels else { return }
+            self.keyboardLabels = labels
+            self.sockets.forEach { $0.broadcastLabels() }
+        }
+    }
+
+    public func setUseTailscale(_ value: Bool) {
         queue.async {
             self.useTailscale = value
             guard self.running else { return self.publish() }
@@ -200,7 +211,7 @@ final class TactileService {
         }
     }
 
-    func revoke(_ id: String) {
+    public func revoke(_ id: String) {
         queue.async {
             self.pairing.revoke(id)
             self.sockets.forEach { $0.disconnect(deviceID: id) }
@@ -208,7 +219,7 @@ final class TactileService {
         }
     }
 
-    func revokeAll() {
+    public func revokeAll() {
         queue.async {
             self.pairing.revokeAll()
             self.sockets.forEach { $0.disconnect(deviceID: nil) }
@@ -300,6 +311,7 @@ final class TactileService {
         socket.isHeld = { [weak self] id in self?.held.contains(id) ?? false }
         socket.onInput = { [weak self] id in self?.inputArrived(from: id) }
         socket.gate = gate
+        socket.keyboardLabels = { [weak self] in self?.keyboardLabels ?? [:] }
         socket.onLatency = { [weak self] id, ms in
             self?.latency[id] = ms
             self?.publish()

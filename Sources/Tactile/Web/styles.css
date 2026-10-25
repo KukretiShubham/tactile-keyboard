@@ -238,6 +238,44 @@ html { touch-action: none; }
 .round-button:active { transform: scale(0.9); }
 .round-button svg { width: 22px; height: 22px; }
 
+/* Shortcut bar: the space between the status and the buttons. Chips keep a
+   44 pt touch height; their names drop out when the bar gets narrow. */
+.shortcut-bar {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 8px;
+  overflow: hidden;
+  container-type: inline-size;
+}
+.shortcut-bar[hidden] { display: none; }
+/* Centred, but if it ever overflows, the first chip stays visible. */
+.shortcut:first-child { margin-left: auto; }
+.shortcut:last-child { margin-right: auto; }
+.shortcut {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 44px;
+  padding: 0 14px;
+  border-radius: 22px;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 590;
+  cursor: pointer;
+  transition: transform 160ms var(--ease);
+}
+.shortcut:active { transform: scale(0.94); }
+.shortcut-glyph { color: var(--accent); font-variant-numeric: tabular-nums; }
+.shortcut-icon svg { width: 20px; height: 20px; display: block; }
+@container (max-width: 1000px) {
+  .shortcut-name { display: none; }
+  .shortcut { padding: 0 12px; }
+}
+.row-detail { margin-left: auto; color: var(--text-2); font-size: 15px; }
+
 /* Landscape with the trackpad: the controls float over the trackpad's top
    corners (placed by app.js), freeing the row the top bar used. Buttons keep
    their 44 pt size; only they take touches, the rest of the trackpad works. */
@@ -250,7 +288,8 @@ html { touch-action: none; }
   padding: 0;
   pointer-events: none;
 }
-[data-controls="overlay"] .toolbar > * { pointer-events: auto; }
+[data-controls="overlay"] .toolbar > :not(.shortcut-bar),
+[data-controls="overlay"] .shortcut { pointer-events: auto; }
 [data-controls="overlay"] .stage { padding-top: max(12px, env(safe-area-inset-top)); }
 [data-controls="overlay"] .trackpad-hint { bottom: 12px; }
 

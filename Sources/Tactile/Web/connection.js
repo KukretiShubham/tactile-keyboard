@@ -130,6 +130,9 @@ export class Connection extends EventTarget {
         if (message.token) storage.set(TOKEN_KEY, message.token);
         this.macName = message.name || 'Mac';
         this.#setState('ready');
+      } else if (message.t === 'layout') {
+        // What each key types on the Mac's keyboard layout, for the key labels.
+        this.dispatchEvent(new CustomEvent('layout', { detail: message.keys ?? {} }));
       } else if (message.t === 'pair') {
         storage.remove(TOKEN_KEY);
         this.#setState('pairing');

@@ -1,5 +1,7 @@
 // Preferences live only on this iPad. Storage can be unavailable (private
 // browsing), so every access is guarded and defaults always apply.
+import { DEFAULT_SHORTCUTS } from './shortcuts.js';
+
 const KEY = 'tactile.settings.v1';
 
 const DEFAULTS = {
@@ -12,6 +14,9 @@ const DEFAULTS = {
   vibration: true,
   tracking: 1.4,
   naturalScroll: true,
+  scrollSpeed: 1,
+  pinchZoom: true,
+  threeFingerDrag: false,
   layout: 'both',
   keyHeight: 'standard',
   functionRow: true,
@@ -20,6 +25,10 @@ const DEFAULTS = {
   floatingFrame: null,
   restFingers: true,
   keyPopups: true,
+  adaptiveTyping: true,
+  macLabels: true,
+  shortcutBar: true,
+  shortcuts: DEFAULT_SHORTCUTS,
   keepAwake: true,
 };
 

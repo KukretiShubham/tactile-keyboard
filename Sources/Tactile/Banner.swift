@@ -1,71 +1,6 @@
+import AppKit
 import CoreImage
-import Darwin
-import Foundation
-import SystemConfiguration
-
-enum Log {
-    private static let clock: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm:ss"
-        return formatter
-    }()
-
-    static func info(_ message: String) { print("\(clock.string(from: Date()))  \(message)") }
-    static func warn(_ message: String) { print("\u{1B}[33m⚠︎ \(message)\u{1B}[0m") }
-    static func input(_ message: String) { print("\u{1B}[2m\(clock.string(from: Date()))  \(message)\u{1B}[0m") }
-}
-
-enum HostInfo {
-    static var computerName: String {
-        (SCDynamicStoreCopyComputerName(nil, nil) as String?) ?? "Mac"
-    }
-
-    static var bonjourName: String? {
-        (SCDynamicStoreCopyLocalHostName(nil) as String?).map { "\($0).local" }
-    }
-
-    /// IPv4 addresses on active interfaces, Wi-Fi/Ethernet first.
-    static var ipv4Addresses: [String] {
-        var found: [(name: String, address: String)] = []
-        var list: UnsafeMutablePointer<ifaddrs>?
-        guard getifaddrs(&list) == 0, let first = list else { return [] }
-        defer { freeifaddrs(list) }
-
-        for entry in sequence(first: first, next: { $0.pointee.ifa_next }) {
-            let flags = Int32(entry.pointee.ifa_flags)
-            guard let address = entry.pointee.ifa_addr, address.pointee.sa_family == UInt8(AF_INET),
-                  flags & IFF_UP != 0, flags & IFF_LOOPBACK == 0 else { continue }
-            var host = [CChar](repeating: 0, count: Int(NI_MAXHOST))
-            guard getnameinfo(address, socklen_t(address.pointee.sa_len), &host, socklen_t(host.count),
-                              nil, 0, NI_NUMERICHOST) == 0 else { continue }
-            let bytes = host.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }
-            found.append((String(cString: entry.pointee.ifa_name), String(decoding: bytes, as: UTF8.self)))
-        }
-        return found.sorted { $0.name.hasPrefix("en") && !$1.name.hasPrefix("en") }.map(\.address)
-    }
-
-    /// This Mac's tailnet name, when Tactile has a Tailscale certificate for it.
-    static var tailscaleName: String?
-
-    static var reachableHosts: Set<String> {
-        var hosts: Set<String> = ["localhost", "127.0.0.1"]
-        hosts.formUnion(ipv4Addresses)
-        if let name = bonjourName { hosts.insert(name.lowercased()) }
-        if let name = tailscaleName { hosts.insert(name.lowercased()) }
-        return hosts
-    }
-}
-
-/// How unrecoverable errors reach the user: printed in Terminal, or an alert
-/// in the menu bar app (which sets its own handler).
-enum Fatal {
-    static var handler: (String) -> Void = { message in
-        fputs("\(message)\n", stderr)
-        exit(1)
-    }
-
-    static func report(_ message: String) { handler(message) }
-}
+import TactileCore
 
 enum QRCode {
     /// A QR code with one pixel per module; scale it up without smoothing.
@@ -74,6 +9,22 @@ enum QRCode {
         filter.setValue(Data(text.utf8), forKey: "inputMessage")
         filter.setValue("M", forKey: "inputCorrectionLevel")
         return filter.outputImage
+    }
+}
+
+/// Small AppKit helpers shared by the menu bar and the pairing window.
+enum Mac {
+    static func copy(_ text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+    }
+
+    static func openAccessibilitySettings() {
+        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+    }
+
+    static func showLog() {
+        NSWorkspace.shared.open(Paths.logFile)
     }
 }
 

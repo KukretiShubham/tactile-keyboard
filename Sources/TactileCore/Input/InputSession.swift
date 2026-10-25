@@ -1,32 +1,10 @@
 import AppKit
-import ApplicationServices
 import CoreGraphics
 
-enum MouseButton: String {
-    case left = "l"
-    case right = "r"
-}
-
-protocol InputTarget: AnyObject {
-    func keyDown(_ code: String, isRepeat: Bool)
-    func keyUp(_ code: String)
-    func move(dx: Double, dy: Double)
-    func button(_ button: MouseButton, down: Bool)
-    func scroll(dx: Double, dy: Double)
-    func system(_ action: String)
-    func type(_ text: String)
-    func releaseAll()
-}
-
-enum Accessibility {
-    static func isTrusted(prompt: Bool) -> Bool {
-        let key = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
-        return AXIsProcessTrustedWithOptions([key: prompt] as CFDictionary)
-    }
-}
-
 /// Posts real keyboard and mouse events for one connected iPad.
-final class InputSession: InputTarget {
+public final class InputSession: InputTarget {
+    public init() {}
+
     private let source = CGEventSource(stateID: .hidSystemState)
     private let doubleClickInterval = NSEvent.doubleClickInterval
     private var heldKeys: Set<CGKeyCode> = []
@@ -43,18 +21,18 @@ final class InputSession: InputTarget {
 
     // MARK: Keyboard
 
-    func keyDown(_ name: String, isRepeat: Bool) {
+    public func keyDown(_ name: String, isRepeat: Bool) {
         guard let code = KeyMap.codes[name] else { return }
         heldKeys.insert(code)
         postKey(code, down: true, isRepeat: isRepeat)
     }
 
-    func keyUp(_ name: String) {
+    public func keyUp(_ name: String) {
         guard let code = KeyMap.codes[name], heldKeys.remove(code) != nil else { return }
         postKey(code, down: false)
     }
 
-    func type(_ text: String) {
+    public func type(_ text: String) {
         for character in text {
             if character.isNewline {
                 tap(KeyMap.returnKey)
@@ -70,23 +48,22 @@ final class InputSession: InputTarget {
         }
     }
 
-    func system(_ action: String) {
+    public func system(_ action: SystemAction) {
         switch action {
-        case "volumeUp": media(0)
-        case "volumeDown": media(1)
-        case "brightnessUp": media(2)
-        case "brightnessDown": media(3)
-        case "mute": media(7)
-        case "playPause": media(16)
-        case "next": media(17)
-        case "previous": media(18)
-        case "missionControl": tap(KeyMap.up, with: .maskControl)
-        case "appExpose": tap(KeyMap.down, with: .maskControl)
-        case "spaceLeft": tap(KeyMap.left, with: .maskControl)
-        case "spaceRight": tap(KeyMap.right, with: .maskControl)
-        case "spotlight": tap(KeyMap.space, with: .maskCommand)
-        case "lockScreen": tap(KeyMap.q, with: [.maskControl, .maskCommand])
-        default: break
+        case .volumeUp: media(0)
+        case .volumeDown: media(1)
+        case .brightnessUp: media(2)
+        case .brightnessDown: media(3)
+        case .mute: media(7)
+        case .playPause: media(16)
+        case .next: media(17)
+        case .previous: media(18)
+        case .missionControl: tap(KeyMap.up, with: .maskControl)
+        case .appExpose: tap(KeyMap.down, with: .maskControl)
+        case .spaceLeft: tap(KeyMap.left, with: .maskControl)
+        case .spaceRight: tap(KeyMap.right, with: .maskControl)
+        case .spotlight: tap(KeyMap.space, with: .maskCommand)
+        case .lockScreen: tap(KeyMap.q, with: [.maskControl, .maskCommand])
         }
     }
 
@@ -120,7 +97,7 @@ final class InputSession: InputTarget {
 
     // MARK: Pointer
 
-    func move(dx: Double, dy: Double) {
+    public func move(dx: Double, dy: Double) {
         let current = cursor
         let target = Display.clamp(CGPoint(x: current.x + dx, y: current.y + dy), near: current)
         let (type, button): (CGEventType, CGMouseButton) =
@@ -134,7 +111,7 @@ final class InputSession: InputTarget {
         event.post(tap: .cghidEventTap)
     }
 
-    func button(_ button: MouseButton, down: Bool) {
+    public func button(_ button: MouseButton, down: Bool) {
         let point = cursor
         if down {
             guard heldButtons.insert(button).inserted else { return }
@@ -162,14 +139,14 @@ final class InputSession: InputTarget {
         event.post(tap: .cghidEventTap)
     }
 
-    func scroll(dx: Double, dy: Double) {
+    public func scroll(dx: Double, dy: Double) {
         guard let event = CGEvent(scrollWheelEvent2Source: source, units: .pixel, wheelCount: 2,
                                   wheel1: Int32(dy.rounded()), wheel2: Int32(dx.rounded()), wheel3: 0) else { return }
         event.flags = modifierFlags
         event.post(tap: .cghidEventTap)
     }
 
-    func releaseAll() {
+    public func releaseAll() {
         // Let go of regular keys before modifiers so nothing fires as a shortcut.
         let order = heldKeys.sorted { (KeyMap.modifierFlags[$0] == nil) && (KeyMap.modifierFlags[$1] != nil) }
         for code in order {
@@ -197,16 +174,4 @@ enum Display {
         guard CGGetActiveDisplayList(count, &ids, &count) == .success else { return [] }
         return ids.prefix(Int(count)).map(CGDisplayBounds)
     }
-}
-
-/// Stand-in used with --dry-run: prints what would have been sent.
-final class LoggingInput: InputTarget {
-    func keyDown(_ code: String, isRepeat: Bool) { Log.input("key down \(code)\(isRepeat ? " (repeat)" : "")") }
-    func keyUp(_ code: String) { Log.input("key up   \(code)") }
-    func move(dx: Double, dy: Double) { Log.input(String(format: "move %.1f, %.1f", dx, dy)) }
-    func button(_ button: MouseButton, down: Bool) { Log.input("\(button) button \(down ? "down" : "up")") }
-    func scroll(dx: Double, dy: Double) { Log.input(String(format: "scroll %.0f, %.0f", dx, dy)) }
-    func system(_ action: String) { Log.input("system \(action)") }
-    func type(_ text: String) { Log.input("type \"\(text)\"") }
-    func releaseAll() { Log.input("release all") }
 }

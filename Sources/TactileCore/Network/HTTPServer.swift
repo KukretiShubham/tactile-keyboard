@@ -3,10 +3,15 @@ import Network
 
 /// A tiny static file server. It only ever serves the in-memory assets it was
 /// given, so requests can't reach anything else on disk.
-final class HTTPServer {
-    struct Asset {
+public final class HTTPServer {
+    public struct Asset: Sendable {
         let body: Data
         let type: String
+
+        public init(body: Data, type: String) {
+            self.body = body
+            self.type = type
+        }
     }
 
     private let listener: NWListener
@@ -24,19 +29,20 @@ final class HTTPServer {
         "png": "image/png",
     ]
 
-    /// Loads every servable file under `root`, keyed by its URL path.
-    static func loadAssets(from root: URL) -> [String: Asset] {
+    /// Loads every servable file under `root`, keyed by its URL path
+    /// (prefixed with `mount`, e.g. "/app").
+    public static func loadAssets(from root: URL, mount: String = "") -> [String: Asset] {
         var assets: [String: Asset] = [:]
         let rootPath = root.standardizedFileURL.path
         let files = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)
         while let url = files?.nextObject() as? URL {
             guard let type = types[url.pathExtension], let body = try? Data(contentsOf: url) else { continue }
-            assets[String(url.standardizedFileURL.path.dropFirst(rootPath.count))] = Asset(body: body, type: type)
+            assets[mount + String(url.standardizedFileURL.path.dropFirst(rootPath.count))] = Asset(body: body, type: type)
         }
         return assets
     }
 
-    static func json(_ object: [String: Any]) -> Asset {
+    public static func json(_ object: [String: Any]) -> Asset {
         Asset(body: (try? JSONSerialization.data(withJSONObject: object)) ?? Data("{}".utf8), type: types["json"]!)
     }
 
@@ -44,8 +50,9 @@ final class HTTPServer {
     ///   - tls: Serve HTTPS with these options, or plain HTTP when nil.
     ///   - policy: The page's Content-Security-Policy.
     ///   - loopbackOnly: Accept connections from this Mac only.
-    init(port: UInt16, tls: NWProtocolTLS.Options?, assets: [String: Asset], policy: String,
-         loopbackOnly: Bool = false, queue: DispatchQueue) throws {
+    ///   - port: 0 picks any free port (see `start(ready:)`).
+    public init(port: UInt16, tls: NWProtocolTLS.Options?, assets: [String: Asset], policy: String,
+                loopbackOnly: Bool = false, queue: DispatchQueue) throws {
         let parameters = tls.map { NWParameters(tls: $0) } ?? .tcp
         parameters.allowLocalEndpointReuse = true
         listener = try NWListener.make(parameters, port: port, loopbackOnly: loopbackOnly)
@@ -54,20 +61,14 @@ final class HTTPServer {
         self.queue = queue
     }
 
-    func start() {
+    /// Starts listening; `ready` receives the port once it's open.
+    public func start(ready: ((UInt16) -> Void)? = nil) {
         listener.newConnectionHandler = { [weak self] connection in self?.accept(connection) }
-        listener.stateUpdateHandler = { [port = listener.port] state in
-            if case .failed(let error) = state {
-                let busy = if case .posix(.EADDRINUSE) = error { true } else { false }
-                Fatal.report(busy
-                    ? "Port \(port.map { "\($0)" } ?? "?") is already in use. Is Tactile already running?"
-                    : "The web server couldn't start: \(error)")
-            }
-        }
+        listener.watch("web server", ready: ready)
         listener.start(queue: queue)
     }
 
-    func stop() {
+    public func stop() {
         listener.cancel()
     }
 
@@ -126,11 +127,29 @@ final class HTTPServer {
 }
 
 extension NWListener {
-    /// A listener on every interface, or only on 127.0.0.1.
+    /// A listener on every interface, or only on 127.0.0.1. Port 0 means any free port.
     static func make(_ parameters: NWParameters, port: UInt16, loopbackOnly: Bool) throws -> NWListener {
-        let port = NWEndpoint.Port(rawValue: port)!
+        let port = port == 0 ? NWEndpoint.Port.any : NWEndpoint.Port(rawValue: port)!
         guard loopbackOnly else { return try NWListener(using: parameters, on: port) }
         parameters.requiredLocalEndpoint = .hostPort(host: .ipv4(.loopback), port: port)
         return try NWListener(using: parameters)
+    }
+
+    /// Reports the port once listening, and turns failures into a clear
+    /// message (most often: another copy of Tactile already has the port).
+    func watch(_ what: String, ready: ((UInt16) -> Void)? = nil) {
+        stateUpdateHandler = { [weak self] state in
+            switch state {
+            case .ready:
+                if let port = self?.port?.rawValue { ready?(port) }
+            case .failed(let error):
+                let busy = if case .posix(.EADDRINUSE) = error { true } else { false }
+                Fatal.report(busy
+                    ? "Port \(self?.port.map { "\($0)" } ?? "?") is already in use. Is Tactile already running?"
+                    : "The \(what) couldn't start: \(error)")
+            default:
+                break
+            }
+        }
     }
 }

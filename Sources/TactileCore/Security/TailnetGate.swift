@@ -5,14 +5,14 @@ import Foundation
 /// signed in as the Mac's owner (a device shared into the tailnet by someone
 /// else, or a tagged device) is refused. If Tailscale can't say, the
 /// connection is refused too.
-final class TailnetGate {
-    enum Verdict {
+public final class TailnetGate {
+    public enum Verdict {
         case allowed(Tailscale.Peer)
         case refused(reason: String)
     }
 
     /// The check can be switched off from the menu.
-    var isEnabled: () -> Bool = { true }
+    public var isEnabled: () -> Bool = { true }
 
     private let ownerID: Int64?
     private let lookups = DispatchQueue(label: "tactile.whois", attributes: .concurrent)
@@ -21,14 +21,14 @@ final class TailnetGate {
     private let cacheLifetime: TimeInterval = 60
 
     /// For tests: answers lookups instead of the real `tailscale whois`.
-    var lookUp: (String) -> Tailscale.Peer? = Tailscale.whois
+    public var lookUp: (String) -> Tailscale.Peer? = Tailscale.whois
 
-    init(ownerID: Int64?) {
+    public init(ownerID: Int64?) {
         self.ownerID = ownerID
     }
 
     /// Calls `completion` on `queue` with whether `address` may connect.
-    func check(_ address: String, on queue: DispatchQueue, completion: @escaping (Verdict) -> Void) {
+    public func check(_ address: String, on queue: DispatchQueue, completion: @escaping (Verdict) -> Void) {
         if let cached = lock.withLock({ cache[address] }), Date().timeIntervalSince(cached.at) < cacheLifetime {
             return queue.async { completion(cached.verdict) }
         }

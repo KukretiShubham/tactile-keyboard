@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import TactileCore
 
 /// What the menu bar panel shows, kept current by `MenuBarController`.
 final class PanelModel: ObservableObject {

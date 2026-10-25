@@ -2,6 +2,7 @@ import AppKit
 import Carbon.HIToolbox
 import ServiceManagement
 import SwiftUI
+import TactileCore
 
 /// The Tactile icon in the menu bar, next to Wi-Fi and Control Center.
 /// Clicking it drops down a panel (in the style of the Wi-Fi menu) with the
@@ -117,19 +118,16 @@ final class MenuBarController: NSObject {
             },
             copyTailscaleLink: { [weak self] in
                 guard let link = self?.state?.tailscaleURL else { return }
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(link, forType: .string)
+                Mac.copy(link)
                 self?.panel.dismiss()
             },
             allowAccessibility: { [weak self] in
                 self?.panel.dismiss()
-                NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+                Mac.openAccessibilitySettings()
             },
             showLog: { [weak self] in
                 self?.panel.dismiss()
-                let log = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
-                    .appendingPathComponent("Logs/Tactile.log")
-                NSWorkspace.shared.open(log)
+                Mac.showLog()
             },
             quit: { [weak self] in
                 self?.service.stopAndWait()

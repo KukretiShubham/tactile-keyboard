@@ -1,6 +1,7 @@
 import AppKit
 import CoreImage
 import SwiftUI
+import TactileCore
 
 /// The "Pair an iPad" window: a QR code to scan, the code to type, and the
 /// addresses to open. It follows the live pairing code.
@@ -113,10 +114,7 @@ final class PairingWindowController {
                         .textSelection(.enabled)
                 }
                 Spacer(minLength: 0)
-                Button("Copy") {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(url, forType: .string)
-                }
+                Button("Copy") { Mac.copy(url) }
                 .controlSize(.small)
             }
             .padding(.horizontal, 14)

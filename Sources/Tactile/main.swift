@@ -1,4 +1,6 @@
 import AppKit
+import Carbon.HIToolbox
+import TactileCore
 
 setvbuf(stdout, nil, _IOLBF, 0)
 
@@ -35,9 +37,8 @@ if arguments.contains("--forget-devices") {
 // (the menu has "Show Log").
 let isApp = Bundle.main.bundleIdentifier != nil
 if isApp {
-    let logs = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0].appendingPathComponent("Logs")
-    try? FileManager.default.createDirectory(at: logs, withIntermediateDirectories: true)
-    let log = logs.appendingPathComponent("Tactile.log")
+    let log = Paths.logFile
+    try? FileManager.default.createDirectory(at: log.deletingLastPathComponent(), withIntermediateDirectories: true)
     if let size = (try? FileManager.default.attributesOfItem(atPath: log.path))?[.size] as? Int, size > 1_000_000 {
         try? FileManager.default.removeItem(at: log)
     }
@@ -89,6 +90,13 @@ if !isApp {
         Banner.show(state)
     }
 }
+
+// Key labels on the iPad follow the Mac's keyboard layout (read on the main
+// thread), including when the input language changes.
+service.setKeyboardLabels(KeyboardLayout.currentLabels())
+let layoutObserver = DistributedNotificationCenter.default().addObserver(
+    forName: Notification.Name(kTISNotifySelectedKeyboardInputSourceChanged as String), object: nil, queue: .main
+) { _ in service.setKeyboardLabels(KeyboardLayout.currentLabels()) }
 
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)

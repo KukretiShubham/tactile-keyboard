@@ -4,7 +4,7 @@ import Network
 /// WebSocket endpoint the iPad talks to. Each connection must pair (or present a
 /// saved token) before any input is accepted, and gets its own input session so
 /// held keys are released when that iPad disconnects.
-final class SocketServer {
+public final class SocketServer {
     private final class Client {
         let connection: NWConnection
         let address: String
@@ -33,16 +33,18 @@ final class SocketServer {
         var y: Double?
         var r: Bool?
         var n: String?
+        /// Keys of a shortcut, e.g. ["MetaLeft", "KeyC"].
+        var ks: [String]?
     }
 
-    private static let inputTypes: Set = ["kd", "ku", "mv", "md", "mu", "sc", "sys", "txt"]
+    private static let inputTypes: Set = ["kd", "ku", "mv", "md", "mu", "sc", "sys", "txt", "combo"]
 
     /// Shown next to device names, e.g. "iPad · Tailscale".
     let route: String
     /// While true, input is ignored (the connection stays up).
     var isPaused: () -> Bool = { false }
     /// A device finished connecting; `isNew` when it just paired.
-    var onConnect: ((Pairing.Device, _ isNew: Bool) -> Void)?
+    public var onConnect: ((Pairing.Device, _ isNew: Bool) -> Void)?
     /// Connected devices changed.
     var onChange: (() -> Void)?
     /// A device disconnected from the menu; it's refused until reconnected.
@@ -55,7 +57,9 @@ final class SocketServer {
     private var probeTimer: DispatchSourceTimer?
 
     /// Set on the Tailscale route: only the Mac owner's devices get in.
-    var gate: TailnetGate?
+    public var gate: TailnetGate?
+    /// What each key types on the Mac's layout, sent so the iPad can label keys.
+    var keyboardLabels: () -> [String: [String]] = { [:] }
 
     private let listener: NWListener
     private let queue: DispatchQueue
@@ -64,14 +68,14 @@ final class SocketServer {
     private var clients: [ObjectIdentifier: Client] = [:]
 
     /// IDs of paired devices connected right now.
-    var connectedDeviceIDs: [String] { clients.values.compactMap(\.deviceID) }
+    public var connectedDeviceIDs: [String] { clients.values.compactMap(\.deviceID) }
 
     /// - Parameters:
     ///   - appPort: Port of the page that serves the app; only that page may connect.
     ///   - tls: Always set in normal use. Nil only for the dry-run development
     ///     copy, which is also limited to this Mac (`loopbackOnly`).
-    init(port: UInt16, appPort: UInt16, tls: NWProtocolTLS.Options?, loopbackOnly: Bool = false, route: String,
-         pairing: Pairing, queue: DispatchQueue, makeInput: @escaping () -> InputTarget) throws {
+    public init(port: UInt16, appPort: UInt16, tls: NWProtocolTLS.Options?, loopbackOnly: Bool = false, route: String,
+                pairing: Pairing, queue: DispatchQueue, makeInput: @escaping () -> InputTarget) throws {
         let scheme = tls == nil ? "http" : "https"
         let options = NWProtocolWebSocket.Options()
         options.autoReplyPing = true
@@ -97,11 +101,10 @@ final class SocketServer {
         self.makeInput = makeInput
     }
 
-    func start() {
+    /// Starts listening; `ready` receives the port once it's open.
+    public func start(ready: ((UInt16) -> Void)? = nil) {
         listener.newConnectionHandler = { [weak self] connection in self?.accept(connection) }
-        listener.stateUpdateHandler = { state in
-            if case .failed(let error) = state { Fatal.report("The secure connection couldn't start: \(error)") }
-        }
+        listener.watch("secure connection", ready: ready)
         listener.start(queue: queue)
 
         // Every few seconds, time a round trip to each device for the menu's
@@ -123,7 +126,7 @@ final class SocketServer {
 
     /// Stops listening and lets go of everything every iPad is holding.
     /// Call on the server queue.
-    func stop() {
+    public func stop() {
         probeTimer?.cancel()
         probeTimer = nil
         listener.cancel()
@@ -139,6 +142,15 @@ final class SocketServer {
     /// Releases held keys and buttons for every connected iPad.
     func releaseAllInput() {
         clients.values.forEach { $0.input.releaseAll() }
+    }
+
+    /// Sends the Mac's current key labels to every connected device.
+    func broadcastLabels() {
+        let labels = keyboardLabels()
+        guard !labels.isEmpty else { return }
+        for client in clients.values where client.deviceID != nil {
+            reply(client, ["t": "layout", "keys": labels])
+        }
     }
 
     /// Disconnects a device right away (for example after it's revoked).
@@ -216,7 +228,7 @@ final class SocketServer {
         }
     }
 
-    private func reply(_ client: Client, _ payload: [String: String]) {
+    private func reply(_ client: Client, _ payload: [String: Any]) {
         guard let data = try? JSONSerialization.data(withJSONObject: payload) else { return }
         let metadata = NWProtocolWebSocket.Metadata(opcode: .text)
         let context = NWConnection.ContentContext(identifier: "reply", metadata: [metadata])
@@ -250,7 +262,12 @@ final class SocketServer {
         case "md", "mu":
             if let button = message.b.flatMap(MouseButton.init) { input.button(button, down: message.t == "md") }
         case "sc": input.scroll(dx: Self.limit(message.x, 2000), dy: Self.limit(message.y, 2000))
-        case "sys": if let action = message.k { input.system(action) }
+        case "sys": if let action = message.k.flatMap(SystemAction.init) { input.system(action) }
+        case "combo":
+            // Shortcuts are a few known keys; anything else is ignored.
+            if let codes = message.ks, (1...5).contains(codes.count), codes.allSatisfy({ KeyMap.codes[$0] != nil }) {
+                input.combo(codes)
+            }
         case "txt": if let text = message.s, text.count <= 4000 { input.type(text) }
         default: break
         }
@@ -269,7 +286,7 @@ final class SocketServer {
                     client.connection.cancel()
                     return
                 }
-                pairing.improveName(device.id, to: "\(client.peer?.deviceName ?? Self.deviceName(message.name)) · \(route)",
+                pairing.improveName(device.id, to: "\(client.peer?.deviceName ?? DeviceKind.name(claimed: message.name)) · \(route)",
                                     isRealName: client.peer != nil)
                 let named = pairing.devices.first { $0.id == device.id } ?? device
                 grant(client, device: named, token: nil)
@@ -277,7 +294,7 @@ final class SocketServer {
                 reply(client, ["t": "pair"])
             }
         case "pair":
-            let name = "\(client.peer?.deviceName ?? Self.deviceName(message.name)) · \(route)"
+            let name = "\(client.peer?.deviceName ?? DeviceKind.name(claimed: message.name)) · \(route)"
             if let code = message.code, let paired = pairing.redeem(code: code, from: client.address, name: name) {
                 Log.info("Paired \(name) at \(client.address)")
                 grant(client, device: paired.device, token: paired.token)
@@ -297,18 +314,14 @@ final class SocketServer {
         var payload = ["t": "ready", "name": HostInfo.computerName]
         if let token { payload["token"] = token }
         reply(client, payload)
+        let labels = keyboardLabels()
+        if !labels.isEmpty { reply(client, ["t": "layout", "keys": labels]) }
         Log.info("Connected \(device.name) (\(client.address))")
         onConnect?(device, token != nil)
         onChange?()
     }
 
     // MARK: Helpers
-
-    /// The browser's own guess at what it is, limited to a few known names.
-    private static func deviceName(_ claimed: String?) -> String {
-        let known = ["iPad", "iPhone", "Android device", "Mac", "Browser"]
-        return known.first { $0 == claimed } ?? "Browser"
-    }
 
     private static func limit(_ value: Double?, _ bound: Double) -> Double {
         guard let value, value.isFinite else { return 0 }

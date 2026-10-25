@@ -26,6 +26,7 @@
       <button class="glass sound-hint" id="soundHint" hidden>
         <span data-icon="speaker"></span>Tap to enable key sounds
       </button>
+      <nav class="shortcut-bar" id="shortcutBar" aria-label="Shortcuts"></nav>
       <div class="toolbar-actions">
         <button class="glass round-button" id="textButton" aria-label="Type with iPad keyboard" data-icon="compose"></button>
         <button class="glass round-button" id="settingsButton" aria-label="Settings" data-icon="settings"></button>
@@ -35,7 +36,7 @@
     <main class="stage" id="stage">
       <section class="deck" id="keyboard" aria-label="Keyboard"></section>
       <section class="trackpad" id="trackpad" aria-label="Trackpad">
-        <p class="trackpad-hint">Tap to click · Two fingers to scroll · Hold, then move to drag</p>
+        <p class="trackpad-hint">Tap to click · Two fingers to scroll or pinch · Hold, then move to drag</p>
       </section>
     </main>
   </div>
@@ -44,7 +45,7 @@
     <div class="sheet glass" role="dialog" aria-modal="true" aria-labelledby="pairTitle">
       <div class="sheet-badge" data-icon="keyboard"></div>
       <h2 id="pairTitle">Pair with Your Mac</h2>
-      <p class="sheet-text">Enter the six-digit code shown in Terminal on your Mac.</p>
+      <p class="sheet-text">Enter the six-digit code from Tactile in your Mac's menu bar.</p>
       <input class="code-field" id="pairCode" inputmode="numeric" pattern="[0-9]*" maxlength="6"
              autocomplete="one-time-code" aria-label="Pairing code" placeholder="000000">
       <p class="sheet-error" id="pairError" role="alert"></p>
@@ -81,8 +82,18 @@
           <label class="row"><span class="row-label">Function Row</span><input type="checkbox" class="switch" data-setting="functionRow"></label>
           <label class="row"><span class="row-label">Rest Fingers on Keys</span><input type="checkbox" class="switch" data-setting="restFingers"></label>
           <label class="row"><span class="row-label">Key Popups</span><input type="checkbox" class="switch" data-setting="keyPopups"></label>
+          <label class="row"><span class="row-label">Adapt to My Typing</span><input type="checkbox" class="switch" data-setting="adaptiveTyping"></label>
+          <label class="row"><span class="row-label">Match Mac Layout</span><input type="checkbox" class="switch" data-setting="macLabels"></label>
+          <button class="row row-button accent" id="resetTyping">Reset Typing Learning</button>
         </div>
         <p class="group-footer">With Rest Fingers on, keys type when you lift your finger, so fingers resting on the keys don't type. Delete and the arrow keys still repeat when held.</p>
+        <p class="group-footer">Adapt to My Typing learns where you press each key and moves its touch area to match, on this iPad only. Match Mac Layout labels the keys for the keyboard layout your Mac uses, such as AZERTY.</p>
+
+        <h3 class="group-title">Shortcut Bar</h3>
+        <div class="group">
+          <label class="row"><span class="row-label">Show Shortcut Bar</span><input type="checkbox" class="switch" data-setting="shortcutBar"></label>
+        </div>
+        <div class="group" id="shortcutList"></div>
 
         <h3 class="group-title">Feedback</h3>
         <div class="group">
@@ -104,8 +115,12 @@
         <h3 class="group-title">Trackpad</h3>
         <div class="group">
           <label class="row"><span class="row-label">Tracking Speed</span><input type="range" class="slider" data-setting="tracking" min="0.5" max="3" step="0.1"></label>
+          <label class="row"><span class="row-label">Scrolling Speed</span><input type="range" class="slider" data-setting="scrollSpeed" min="0.3" max="3" step="0.1"></label>
           <label class="row"><span class="row-label">Natural Scrolling</span><input type="checkbox" class="switch" data-setting="naturalScroll"></label>
+          <label class="row"><span class="row-label">Pinch to Zoom</span><input type="checkbox" class="switch" data-setting="pinchZoom"></label>
+          <label class="row"><span class="row-label">Three-Finger Drag</span><input type="checkbox" class="switch" data-setting="threeFingerDrag"></label>
         </div>
+        <p class="group-footer">Pinch to Zoom zooms the app you're using, like ⌘+ and ⌘−. With Three-Finger Drag on, drag windows and text with three fingers; swiping between spaces then takes four.</p>
 
         <h3 class="group-title">Layout</h3>
         <div class="group">

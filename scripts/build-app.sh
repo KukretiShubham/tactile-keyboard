@@ -2,7 +2,7 @@
 # Builds build/Tactile.app: a menu bar app that holds its own Accessibility
 # permission (instead of Terminal holding it).
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 
 swift build -c release
 BIN="$(swift build -c release --show-bin-path)"

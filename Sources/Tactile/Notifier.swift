@@ -1,3 +1,4 @@
+import TactileCore
 import UserNotifications
 
 /// macOS notifications for pairings and connections, so you always know when

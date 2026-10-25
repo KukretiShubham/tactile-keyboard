@@ -2,9 +2,13 @@ import { Connection } from './connection.js';
 import { Feedback } from './feedback.js';
 import { createFloating, HANDLE_SPACE } from './floating.js';
 import { createKeyboard } from './keyboard.js';
-import { settings } from './settings.js';
+import { settings, storage } from './settings.js';
 import { setupSheets } from './sheets.js';
+import { createShortcutBar } from './shortcuts.js';
 import { createTrackpad } from './trackpad.js';
+import { TypingModel } from './typing-model.js';
+import { clamp, contentBox } from './util.js';
+import { keepScreenAwake } from './wake-lock.js';
 
 const root = document.documentElement;
 const app = document.getElementById('app');
@@ -26,7 +30,8 @@ if (location.hash) history.replaceState(null, '', location.pathname + location.s
 let pairingLinkUsed = false;
 
 const deck = document.getElementById('keyboard');
-const keyboard = createKeyboard(deck, { send, feedback, settings });
+const typingModel = new TypingModel(storage);
+const keyboard = createKeyboard(deck, { send, feedback, settings, model: typingModel });
 // While the handle or grip is being dragged, the keyboard follows this frame;
 // it's saved when the finger lifts.
 let liveFrame = null;
@@ -41,7 +46,22 @@ const trackpad = createTrackpad(document.getElementById('trackpad'), {
   onClick: () => keyboard.releaseLatched(),
   isCongested: () => connection.congested,
 });
-const sheets = setupSheets({ connection, feedback });
+const shortcutBar = createShortcutBar(document.getElementById('shortcutBar'), {
+  send, feedback, settings,
+  beforeSend: () => keyboard.releaseLatched(),
+});
+const sheets = setupSheets({ connection, feedback, typingModel });
+
+// Key labels and shortcuts follow the Mac's keyboard layout.
+let macLabels = {};
+function applyLabels() {
+  keyboard.setLabels(settings.get('macLabels') ? macLabels : {});
+  shortcutBar.setLabels(macLabels);
+}
+connection.addEventListener('layout', ({ detail }) => {
+  macLabels = detail;
+  applyLabels();
+});
 
 // Appearance
 function applySkin() {
@@ -70,13 +90,11 @@ function fit() {
   // row of their own.
   const overlay = layout === 'both' && innerWidth > innerHeight;
   app.dataset.controls = overlay ? 'overlay' : 'bar';
-  const style = getComputedStyle(stage);
-  const width = stage.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
-  const height = stage.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+  const { width, height, paddingLeft, paddingTop } = contentBox(stage);
 
-  const gap = Math.min(8, Math.max(4, width * 0.0055));
-  const pad = Math.min(18, Math.max(8, width * 0.012));
-  const stageGap = Math.min(14, Math.max(8, height * 0.016));
+  const gap = clamp(width * 0.0055, 4, 8);
+  const pad = clamp(width * 0.012, 8, 18);
+  const stageGap = clamp(height * 0.016, 8, 14);
   // Taller keys give fingers more room vertically, where most misses happen.
   // Standard keys are square, like a Mac keyboard's.
   const keyHeightRatio = settings.get('keyHeight') === 'tall' ? 1.2 : 1;
@@ -93,7 +111,7 @@ function fit() {
   if (floats) {
     const minWidth = Math.min(14.5 * 40 + 13.5 * gap + 2 * pad, width);
     floatMinWidth = minWidth;
-    const deckWidth = Math.min(Math.max(frame.w * width, minWidth), width);
+    const deckWidth = clamp(frame.w * width, minWidth, width);
     const fromWidth = (deckWidth - 2 * pad - 13.5 * gap) / 14.5;
     const fromHeight = (height - HANDLE_SPACE - 2 * pad - rowGaps * gap) / (rows * keyHeightRatio);
     unit = Math.max(20, Math.floor(Math.min(fromWidth, fromHeight) * 10) / 10);
@@ -104,7 +122,7 @@ function fit() {
   let keyHeight = unit * keyHeightRatio;
   if (expanded) {
     const fill = (height - 2 * pad - rowGaps * gap) / rows;
-    keyHeight = Math.min(Math.max(keyHeight, fill), unit * 2.2);
+    keyHeight = clamp(fill, keyHeight, unit * 2.2);
   }
 
   root.style.setProperty('--u', `${unit}px`);
@@ -124,10 +142,10 @@ function fit() {
     // Centre the keyboard on its saved spot, kept fully on screen.
     const deckWidth = deck.offsetWidth;
     const deckHeight = deck.offsetHeight;
-    const left = Math.min(Math.max(frame.cx * width - deckWidth / 2, 0), Math.max(0, width - deckWidth));
-    const top = Math.min(Math.max(frame.cy * height - deckHeight / 2, 0), Math.max(0, height - deckHeight - HANDLE_SPACE));
-    deck.style.left = `${left + parseFloat(style.paddingLeft)}px`;
-    deck.style.top = `${top + parseFloat(style.paddingTop)}px`;
+    const left = clamp(frame.cx * width - deckWidth / 2, 0, width - deckWidth);
+    const top = clamp(frame.cy * height - deckHeight / 2, 0, height - deckHeight - HANDLE_SPACE);
+    deck.style.left = `${left + paddingLeft}px`;
+    deck.style.top = `${top + paddingTop}px`;
   } else {
     deck.style.left = deck.style.top = '';
   }
@@ -136,7 +154,7 @@ function fit() {
 settings.subscribe((key) => {
   if (key === 'skin' || key === 'glow') applySkin();
   if (['layout', 'keyHeight', 'functionRow', 'keyboardPosition', 'keyboardSize', 'floatingFrame'].includes(key)) fit();
-  if (key === 'keepAwake') keepAwake();
+  if (key === 'macLabels') applyLabels();
 });
 prefersDark.addEventListener('change', applySkin);
 new ResizeObserver(fit).observe(stage);
@@ -175,26 +193,7 @@ connection.addEventListener('denied', ({ detail }) => {
   sheets.pairingDenied(pairingLinkUsed && detail === 'code' ? 'expired' : detail);
 });
 
-// Keep the screen on while Tactile is open, so the iPad doesn't dim mid-sentence
-// and the connection doesn't drop. Safari releases the lock when the page is
-// hidden, so it's requested again whenever the page comes back.
-let wakeLock = null;
-async function keepAwake() {
-  if (!settings.get('keepAwake')) {
-    await wakeLock?.release();
-    wakeLock = null;
-    return;
-  }
-  if (document.hidden || !('wakeLock' in navigator) || (wakeLock && !wakeLock.released)) return;
-  try {
-    wakeLock = await navigator.wakeLock.request('screen');
-  } catch {
-    // Refused (for example in Low Power Mode); the iPad just sleeps as usual.
-  }
-}
-document.addEventListener('visibilitychange', keepAwake);
-window.addEventListener('pointerdown', keepAwake, { capture: true });
-keepAwake();
+keepScreenAwake(settings);
 
 // Safari starts audio only from a finger lifting, a click or a key press
 // (not a finger touching down), so try on each of those until it works.

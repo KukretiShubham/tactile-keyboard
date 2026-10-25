@@ -40,5 +40,5 @@ PASSWORD="$(/usr/bin/openssl rand -hex 16)"
 security import "$WORK/identity.p12" -k "$HOME/Library/Keychains/login.keychain-db" \
     -P "$PASSWORD" -T /usr/bin/codesign
 
-echo "Created \"$NAME\". Now run ./build-app.sh (or double-click start-tactile.command)."
+echo "Created \"$NAME\". Now run scripts/build-app.sh (or double-click start-tactile.command)."
 echo "If macOS asks whether codesign may use the key, choose Always Allow."

@@ -1,5 +1,7 @@
 import { ICONS } from './icons.js';
 import { settings } from './settings.js';
+import { SHORTCUTS } from './shortcuts.js';
+import { el } from './util.js';
 
 export const SKINS = [
   { id: 'auto', name: 'Automatic', note: 'Follows iPad appearance' },
@@ -15,23 +17,12 @@ const GLOWS = [
 ];
 
 function miniKeyboard(skin) {
-  const preview = document.createElement('div');
-  preview.className = 'mini-deck';
-  preview.dataset.skin = skin;
-  for (const count of [7, 6, 4]) {
-    const row = document.createElement('div');
-    row.className = 'mini-row';
-    for (let i = 0; i < count; i++) {
-      const key = document.createElement('i');
-      if (count === 4 && i === 1) key.className = 'wide';
-      row.append(key);
-    }
-    preview.append(row);
-  }
-  return preview;
+  const row = (count) => el('div', { className: 'mini-row' },
+    ...Array.from({ length: count }, (_, i) => el('i', { className: count === 4 && i === 1 ? 'wide' : '' })));
+  return el('div', { className: 'mini-deck', attrs: { 'data-skin': skin } }, row(7), row(6), row(4));
 }
 
-export function setupSheets({ connection, feedback }) {
+export function setupSheets({ connection, feedback, typingModel }) {
   const open = (sheet) => {
     sheet.hidden = false;
     requestAnimationFrame(() => sheet.classList.add('shown'));
@@ -49,33 +40,51 @@ export function setupSheets({ connection, feedback }) {
 
   const skinGrid = document.getElementById('skinGrid');
   for (const skin of SKINS) {
-    const card = document.createElement('button');
-    card.className = 'skin-card';
-    card.dataset.value = skin.id;
-    card.setAttribute('aria-label', skin.name);
     const preview = skin.id === 'auto'
-      ? Object.assign(document.createElement('div'), { className: 'mini-split' })
+      ? el('div', { className: 'mini-split' }, miniKeyboard('silver'), miniKeyboard('midnight'))
       : miniKeyboard(skin.id);
-    if (skin.id === 'auto') preview.append(miniKeyboard('silver'), miniKeyboard('midnight'));
-    const name = Object.assign(document.createElement('span'), { className: 'skin-name', textContent: skin.name });
-    const note = Object.assign(document.createElement('span'), { className: 'skin-note', textContent: skin.note });
-    const check = Object.assign(document.createElement('span'), { className: 'skin-check', innerHTML: ICONS.check });
-    card.append(preview, name, note, check);
+    const card = el('button', { className: 'skin-card', attrs: { 'data-value': skin.id, 'aria-label': skin.name } },
+      preview,
+      el('span', { className: 'skin-name', text: skin.name }),
+      el('span', { className: 'skin-note', text: skin.note }),
+      el('span', { className: 'skin-check', html: ICONS.check }));
     card.addEventListener('click', () => settings.set('skin', skin.id));
     skinGrid.append(card);
   }
 
   const swatches = document.getElementById('glowSwatches');
   for (const [name, color] of GLOWS) {
-    const swatch = document.createElement('button');
-    swatch.className = 'swatch';
-    swatch.setAttribute('role', 'radio');
-    swatch.setAttribute('aria-label', name);
-    swatch.dataset.value = color;
-    swatch.style.setProperty('--swatch', color);
+    const swatch = el('button', {
+      className: 'swatch',
+      attrs: { role: 'radio', 'aria-label': name, 'data-value': color },
+      style: { '--swatch': color },
+    });
     swatch.addEventListener('click', () => settings.set('glow', color));
     swatches.append(swatch);
   }
+
+  // One switch per shortcut; the bar shows them in this list's order.
+  const shortcutList = document.getElementById('shortcutList');
+  for (const shortcut of SHORTCUTS) {
+    const toggle = el('input', { className: 'switch', attrs: { type: 'checkbox', 'data-shortcut': shortcut.id } });
+    toggle.addEventListener('change', () => {
+      const chosen = new Set(settings.get('shortcuts'));
+      if (toggle.checked) chosen.add(shortcut.id);
+      else chosen.delete(shortcut.id);
+      settings.set('shortcuts', SHORTCUTS.map(({ id }) => id).filter((id) => chosen.has(id)));
+    });
+    shortcutList.append(el('label', { className: 'row' },
+      el('span', { className: 'row-label', text: shortcut.name }),
+      el('span', { className: 'row-detail', text: shortcut.glyph ?? '' }),
+      toggle));
+  }
+
+  const resetTyping = document.getElementById('resetTyping');
+  resetTyping.addEventListener('click', () => {
+    typingModel.reset();
+    resetTyping.textContent = 'Typing Learning Reset';
+    setTimeout(() => { resetTyping.textContent = 'Reset Typing Learning'; }, 1600);
+  });
 
   for (const input of settingsSheet.querySelectorAll('input[data-setting]')) {
     const key = input.dataset.setting;
@@ -119,6 +128,11 @@ export function setupSheets({ connection, feedback }) {
     swatches.querySelectorAll('.swatch').forEach((swatch) => {
       swatch.setAttribute('aria-checked', swatch.dataset.value === settings.get('glow'));
     });
+    const chosen = new Set(settings.get('shortcuts'));
+    shortcutList.querySelectorAll('[data-shortcut]').forEach((toggle) => {
+      toggle.checked = chosen.has(toggle.dataset.shortcut);
+    });
+    shortcutList.hidden = !settings.get('shortcutBar');
     const glowing = document.documentElement.dataset.skin === 'midnight';
     document.getElementById('glowGroup').hidden = !glowing;
 
@@ -199,8 +213,8 @@ export function setupSheets({ connection, feedback }) {
       pairCode.value = '';
       pairError.textContent = {
         locked: 'Too many tries. Wait a minute, then try again.',
-        expired: 'That QR code has expired. Enter the code shown in Terminal now.',
-      }[reason] ?? "That code didn't match. Check Terminal on your Mac.";
+        expired: 'That QR code has expired. Enter the code your Mac shows now.',
+      }[reason] ?? "That code didn't match. Check the code in Tactile's menu on your Mac.";
     },
   };
 }
