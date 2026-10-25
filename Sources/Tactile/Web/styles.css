@@ -246,8 +246,14 @@ html { touch-action: none; }
   display: flex;
   gap: 8px;
   overflow: hidden;
+  /* Room inside the clipping edge for the chips' shadows (see --glass-shadow);
+     the bar itself lets touches through to whatever is under it. */
+  padding: 24px 32px 40px;
+  margin: -24px -32px -40px;
+  pointer-events: none;
   container-type: inline-size;
 }
+.shortcut { pointer-events: auto; }
 .shortcut-bar[hidden] { display: none; }
 /* Centred, but if it ever overflows, the first chip stays visible. */
 .shortcut:first-child { margin-left: auto; }
@@ -288,8 +294,7 @@ html { touch-action: none; }
   padding: 0;
   pointer-events: none;
 }
-[data-controls="overlay"] .toolbar > :not(.shortcut-bar),
-[data-controls="overlay"] .shortcut { pointer-events: auto; }
+[data-controls="overlay"] .toolbar > :not(.shortcut-bar) { pointer-events: auto; }
 [data-controls="overlay"] .stage { padding-top: max(12px, env(safe-area-inset-top)); }
 [data-controls="overlay"] .trackpad-hint { bottom: 12px; }
 
