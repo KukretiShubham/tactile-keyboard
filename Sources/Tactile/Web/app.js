@@ -65,15 +65,21 @@ function fit() {
   app.dataset.functionRow = functionRow ? 'on' : 'off';
   app.dataset.position = settings.get('keyboardPosition');
   app.dataset.size = size;
+  // In landscape, height is what's scarce: with the trackpad showing, the top
+  // bar's controls float over the trackpad's top corners instead of taking a
+  // row of their own.
+  const overlay = layout === 'both' && innerWidth > innerHeight;
+  app.dataset.controls = overlay ? 'overlay' : 'bar';
   const style = getComputedStyle(stage);
   const width = stage.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
   const height = stage.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
 
   const gap = Math.min(8, Math.max(4, width * 0.0055));
   const pad = Math.min(18, Math.max(8, width * 0.012));
-  const stageGap = Math.min(22, Math.max(10, height * 0.025));
+  const stageGap = Math.min(14, Math.max(8, height * 0.016));
   // Taller keys give fingers more room vertically, where most misses happen.
-  const keyHeightRatio = settings.get('keyHeight') === 'tall' ? 1.15 : 0.92;
+  // Standard keys are square, like a Mac keyboard's.
+  const keyHeightRatio = settings.get('keyHeight') === 'tall' ? 1.2 : 1;
   const rows = functionRow ? 5.55 : 5;
   const rowGaps = functionRow ? 5 : 4;
   const unitFromWidth = (width - 2 * pad - 13.5 * gap) / 14.5;
@@ -106,6 +112,13 @@ function fit() {
   root.style.setProperty('--g', `${gap.toFixed(1)}px`);
   root.style.setProperty('--deck-pad', `${pad.toFixed(1)}px`);
   root.style.setProperty('--stage-gap', `${stageGap.toFixed(1)}px`);
+
+  if (overlay) {
+    const pad = document.getElementById('trackpad').getBoundingClientRect();
+    root.style.setProperty('--controls-top', `${Math.round(pad.top + 10)}px`);
+    root.style.setProperty('--controls-left', `${Math.round(pad.left + 10)}px`);
+    root.style.setProperty('--controls-right', `${Math.round(innerWidth - pad.right + 10)}px`);
+  }
 
   if (floats) {
     // Centre the keyboard on its saved spot, kept fully on screen.

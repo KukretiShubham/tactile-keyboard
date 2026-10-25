@@ -238,6 +238,22 @@ html { touch-action: none; }
 .round-button:active { transform: scale(0.9); }
 .round-button svg { width: 22px; height: 22px; }
 
+/* Landscape with the trackpad: the controls float over the trackpad's top
+   corners (placed by app.js), freeing the row the top bar used. Buttons keep
+   their 44 pt size; only they take touches, the rest of the trackpad works. */
+[data-controls="overlay"] .toolbar {
+  position: absolute;
+  z-index: 3;
+  top: var(--controls-top, 10px);
+  left: var(--controls-left, 10px);
+  right: var(--controls-right, 10px);
+  padding: 0;
+  pointer-events: none;
+}
+[data-controls="overlay"] .toolbar > * { pointer-events: auto; }
+[data-controls="overlay"] .stage { padding-top: max(12px, env(safe-area-inset-top)); }
+[data-controls="overlay"] .trackpad-hint { bottom: 12px; }
+
 /* ───────────────────────── Stage ───────────────────────── */
 
 .stage {
@@ -476,7 +492,9 @@ html { touch-action: none; }
   position: relative;
   flex: 1;
   min-height: 140px;
-  width: calc((14.5 * var(--u) + 13.5 * var(--g) + 2 * var(--deck-pad)) * 0.62);
+  /* As wide as the keyboard: on a touch screen, more trackpad is better than
+     empty space beside it. */
+  width: calc(14.5 * var(--u) + 13.5 * var(--g) + 2 * var(--deck-pad));
   max-width: 100%;
   overflow: hidden;
   border-radius: calc(var(--u) * 0.3);
@@ -487,9 +505,6 @@ html { touch-action: none; }
   transition: box-shadow 200ms ease;
 }
 [data-layout="trackpad"] .trackpad { width: 100%; border-radius: 28px; }
-@media (orientation: portrait) {
-  .trackpad { width: calc(14.5 * var(--u) + 13.5 * var(--g) + 2 * var(--deck-pad)); }
-}
 .trackpad.dragging { box-shadow: var(--pad-shadow), inset 0 0 0 2px var(--accent); }
 [data-skin="midnight"] .trackpad.dragging { box-shadow: var(--pad-shadow), inset 0 0 0 2px var(--glow); }
 

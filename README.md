@@ -87,6 +87,7 @@ Other settings (gear button, top right):
 
 - **Pairing:** scanning the QR code in Terminal also pairs the iPad, so there's no code to type. Each code works once; Terminal shows a new QR and code after every pairing.
 - **Rest Fingers on Keys** (on by default): keys type when you lift your finger, so fingers resting on the keys don't type. If you roll from one key to the next, the letters still come out in the order you pressed them. Delete and the arrow keys still repeat when held.
+- **Landscape:** with the trackpad showing, the status and buttons float over the trackpad's top corners, so the keyboard and trackpad get the whole height. Keys are square like a Mac keyboard's. Tactile is tuned for iPads in landscape. Add it to the Home Screen for the most room, since Safari's toolbar takes about 60 pt.
 - **Keyboard Position:** Top or Bottom with the trackpad (Bottom docks the keys like the iPad's own keyboard). In keyboard-only layout, Middle is also available.
 - **Keyboard Size** (keyboard-only layout):
   - **Expanded** makes the keys taller to fill the screen.
