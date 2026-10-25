@@ -140,9 +140,18 @@ document.addEventListener('visibilitychange', keepAwake);
 window.addEventListener('pointerdown', keepAwake, { capture: true });
 keepAwake();
 
-// Audio can only start from a touch.
-window.addEventListener('pointerdown', () => feedback.unlock(), { capture: true });
-window.addEventListener('touchend', () => feedback.unlock(), { capture: true });
+// Safari starts audio only from a finger lifting, a click or a key press
+// (not a finger touching down), so try on each of those until it works.
+for (const type of ['pointerup', 'touchend', 'click', 'keydown']) {
+  window.addEventListener(type, () => { if (feedback.needsTap) feedback.unlock(); }, { capture: true });
+}
+
+// If Safari still hasn't allowed sound, say so instead of staying silent.
+const soundHint = document.getElementById('soundHint');
+const showSoundHint = () => { soundHint.hidden = !feedback.needsTap; };
+feedback.addEventListener('state', showSoundHint);
+soundHint.addEventListener('click', () => feedback.preview());
+setTimeout(showSoundHint, 1500);
 
 // Never leave a key or button held on the Mac when the iPad looks away.
 document.addEventListener('visibilitychange', () => {

@@ -92,8 +92,12 @@ export function createTrackpad(el, { send, feedback, settings, onClick, isConges
 
   el.addEventListener('pointerdown', (event) => {
     event.preventDefault();
-    el.setPointerCapture(event.pointerId);
+    try { el.setPointerCapture(event.pointerId); } catch { /* touch already ended */ }
     stopGlide();
+    // The first finger of a new touch is "primary" only when no other finger
+    // is down. Anything still remembered is a finger whose lift Safari never
+    // reported; left in place, it would turn one-finger moves into scrolling.
+    if (event.isPrimary && touches.size > 0) forgetTouches();
     touches.set(event.pointerId, { x: event.clientX, y: event.clientY, t: event.timeStamp });
     showTouch(event.pointerId, event.clientX, event.clientY);
 
@@ -176,19 +180,27 @@ export function createTrackpad(el, { send, feedback, settings, onClick, isConges
   };
   el.addEventListener('pointerup', end);
   el.addEventListener('pointercancel', end);
+  // Losing the touch (for example to a system gesture) counts as lifting it.
+  el.addEventListener('lostpointercapture', end);
+
+  /** Drops every remembered finger, letting go of a drag in progress. */
+  function forgetTouches() {
+    if (dragging) send({ t: 'mu', b: 'l' });
+    clearTimeout(holdTimer);
+    touches.clear();
+    gesture = null;
+    dragging = false;
+    el.classList.remove('dragging');
+    el.querySelectorAll('.touch-dot').forEach((dot) => dot.remove());
+  }
 
   return {
     reset() {
       stopGlide();
-      clearTimeout(holdTimer);
       cancelAnimationFrame(frame);
       frame = 0;
       pending.mx = pending.my = pending.sx = pending.sy = 0;
-      touches.clear();
-      gesture = null;
-      dragging = false;
-      el.classList.remove('dragging');
-      el.querySelectorAll('.touch-dot').forEach((dot) => dot.remove());
+      forgetTouches();
     },
   };
 }

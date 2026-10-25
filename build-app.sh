@@ -19,10 +19,18 @@ swift Packaging/render-icon.swift Packaging/AppIcon.svg "$ICONSET"
 iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns"
 rm -rf "$(dirname "$ICONSET")"
 
-# Signed locally ("ad-hoc"). macOS ties Accessibility to the signature, so
-# after a rebuild you may need to switch Tactile off and on again under
-# Privacy & Security → Accessibility.
-codesign --force --sign - --options runtime --identifier app.tactile.mac "$APP"
+# macOS ties Accessibility to the app's signature. With a stable certificate
+# (create a "Code Signing" certificate named "Tactile Local Signing" once in
+# Keychain Access), the permission survives rebuilds. Without one the app is
+# signed ad-hoc, and every rebuild needs Accessibility switched on again.
+IDENTITY="Tactile Local Signing"
+if security find-certificate -c "$IDENTITY" >/dev/null 2>&1; then
+    codesign --force --sign "$IDENTITY" --options runtime --identifier app.tactile.mac "$APP"
+    echo "Signed with \"$IDENTITY\" (Accessibility stays allowed across rebuilds)."
+else
+    codesign --force --sign - --options runtime --identifier app.tactile.mac "$APP"
+    echo "Signed ad-hoc: switch Tactile's Accessibility permission on again after this build."
+fi
 codesign --verify --strict "$APP"
 
 echo "Built $APP"

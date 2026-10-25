@@ -306,6 +306,25 @@ html { touch-action: none; }
 
 .key.on { background: var(--key-bg-on); border-color: var(--key-border-pressed); }
 
+/* The character under your finger, shown above it (like the iPhone keyboard). */
+.key-popup {
+  position: fixed;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  border-radius: calc(var(--u) * 0.16);
+  background: var(--key-bg);
+  border: 1px solid var(--key-border-pressed);
+  box-shadow: var(--key-shadow-pressed), 0 10px 24px rgba(0, 0, 0, 0.35);
+  color: var(--legend);
+  text-shadow: var(--legend-glow);
+  font: 400 calc(var(--u) * 0.5) / 1 var(--font);
+  pointer-events: none;
+  animation: popup-in 90ms var(--ease);
+}
+[data-skin="frosted"] .key-popup { background: rgba(60, 60, 70, 0.92); }
+@keyframes popup-in { from { transform: translateY(6px) scale(0.85); opacity: 0; } }
+
 /* Home-row bumps on F and J, so fingers can find their place by sight. */
 .key[data-code="KeyF"]::after,
 .key[data-code="KeyJ"]::after {
@@ -621,6 +640,22 @@ html { touch-action: none; }
   cursor: pointer;
 }
 .destructive { color: var(--red); }
+.row-button.accent { color: var(--accent); }
+
+/* Shown only while Safari is still holding back key sounds. */
+.sound-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 16px 0 12px;
+  border-radius: 18px;
+  font-size: 14px;
+  font-weight: 590;
+  cursor: pointer;
+}
+.sound-hint[hidden] { display: none; }
+.sound-hint span, .sound-hint svg { width: 18px; height: 18px; display: block; color: var(--accent); }
 
 /* Switch */
 .switch {

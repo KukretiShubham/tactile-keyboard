@@ -31,7 +31,7 @@ Click the Tactile icon in the menu bar. Hover over it to see the status. The ico
 
 Tactile sends a macOS notification when a new device pairs, and when a device connects after being away for a while.
 
-Each rebuild of the app is signed locally, so macOS may ask for Accessibility again. If typing stops working after an update, switch Tactile off and on again under System Settings → Privacy & Security → Accessibility.
+**Keep the Accessibility permission across rebuilds:** run `./create-signing-certificate.sh` once. It adds a self-signed "Tactile Local Signing" code-signing certificate to your login keychain, and `build-app.sh` signs with it from then on. Without it, the app is signed ad-hoc and macOS asks for Accessibility again after every rebuild. The first build after creating the certificate still needs approving once: run `tccutil reset Accessibility app.tactile.mac`, open Tactile, and switch it on.
 
 ### Fastest: Tailscale (no certificate setup)
 
@@ -84,6 +84,8 @@ Other settings (gear button, top right):
 - **Keyboard Position:** Top or Bottom with the trackpad (Bottom docks the keys like the iPad's own keyboard). In keyboard-only layout, Middle is also available.
 - **Keyboard Size:** in keyboard-only layout, **Expanded** makes the keys taller to fill the screen.
 - **Keep Screen Awake** (on by default): the iPad doesn't dim or sleep while Tactile is open.
+- **Key Popups** (on by default): letters and symbols appear in a bubble above your finger, like the iPhone keyboard.
+- **Key sounds:** each click comes from the side of the keyboard the key is on, and Crisp and Thock add a softer second click when the key comes back up. Safari only allows sound after a tap, so the first keystroke turns sound on. If it hasn't, a "Tap to enable key sounds" button appears at the top. **Test Sound** in Settings plays a sample. **Sound in Silent Mode** plays sounds even when the iPad is muted, but pauses any music playing on the iPad.
 
 ## How it works
 

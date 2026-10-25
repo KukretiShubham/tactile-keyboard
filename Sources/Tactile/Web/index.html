@@ -23,6 +23,9 @@
         <span class="status-dot"></span>
         <span class="status-label" id="statusLabel">Connecting…</span>
       </div>
+      <button class="glass sound-hint" id="soundHint" hidden>
+        <span data-icon="speaker"></span>Tap to enable key sounds
+      </button>
       <div class="toolbar-actions">
         <button class="glass round-button" id="textButton" aria-label="Type with iPad keyboard" data-icon="compose"></button>
         <button class="glass round-button" id="settingsButton" aria-label="Settings" data-icon="settings"></button>
@@ -77,6 +80,7 @@
           </div>
           <label class="row"><span class="row-label">Function Row</span><input type="checkbox" class="switch" data-setting="functionRow"></label>
           <label class="row"><span class="row-label">Rest Fingers on Keys</span><input type="checkbox" class="switch" data-setting="restFingers"></label>
+          <label class="row"><span class="row-label">Key Popups</span><input type="checkbox" class="switch" data-setting="keyPopups"></label>
         </div>
         <p class="group-footer">With Rest Fingers on, keys type when you lift your finger, so fingers resting on the keys don't type. Delete and the arrow keys still repeat when held.</p>
 
@@ -90,8 +94,11 @@
             </div>
           </div>
           <label class="row"><span class="row-label">Volume</span><input type="range" class="slider" data-setting="volume" min="0" max="1" step="0.05"></label>
+          <label class="row"><span class="row-label">Sound in Silent Mode</span><input type="checkbox" class="switch" data-setting="soundInSilentMode"></label>
           <label class="row"><span class="row-label">Vibration</span><input type="checkbox" class="switch" data-setting="vibration" id="vibrationSwitch"></label>
+          <button class="row row-button accent" id="testSound">Test Sound</button>
         </div>
+        <p class="group-footer">Sound in Silent Mode plays key sounds even when the iPad is muted, but pauses music playing on the iPad.</p>
         <p class="group-footer" id="vibrationNote"></p>
 
         <h3 class="group-title">Trackpad</h3>

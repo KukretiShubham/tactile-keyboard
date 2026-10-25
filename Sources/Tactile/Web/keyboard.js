@@ -252,10 +252,49 @@ export function createKeyboard(root, { send, feedback, settings }) {
     releaseLatched();
   }
 
+  // Where a key sits across the keyboard, from -1 (left) to 1 (right), so its
+  // sound comes from that side.
+  function positionOf(el) {
+    const deck = root.getBoundingClientRect();
+    const key = el.getBoundingClientRect();
+    return ((key.left + key.width / 2 - deck.left) / deck.width) * 2 - 1;
+  }
+
+  // A bubble above the finger showing the character, since the finger covers
+  // the key itself. Letters and symbols only, like the iPhone keyboard.
+  const popups = new Map(); // pointerId → element
+  function showPopup(pointerId, el, def) {
+    if (!settings.get('keyPopups') || (def.kind !== 'letter' && def.kind !== 'pair')) return;
+    const shifted = shiftActive();
+    const text = def.kind === 'letter'
+      ? (shifted || capsLock ? def.label : def.label.toLowerCase())
+      : (shifted ? def.shifted : def.label);
+    const r = el.getBoundingClientRect();
+    const width = Math.max(r.width * 1.25, 52);
+    const height = Math.max(r.height * 1.15, 56);
+    const popup = document.createElement('div');
+    popup.className = 'key-popup';
+    popup.textContent = text;
+    popup.style.width = `${width}px`;
+    popup.style.height = `${height}px`;
+    popup.style.left = `${Math.min(Math.max(r.left + r.width / 2 - width / 2, 4), innerWidth - width - 4)}px`;
+    popup.style.top = `${Math.max(r.top - height - 8, 4)}px`;
+    document.body.append(popup);
+    hidePopup(pointerId);
+    popups.set(pointerId, popup);
+  }
+  function hidePopup(pointerId) {
+    popups.get(pointerId)?.remove();
+    popups.delete(pointerId);
+  }
+
   // Types a key that was waiting for its finger to lift.
   function commit(press) {
     press.committed = true;
-    feedback.key(soundKind(press.deferred));
+    const kind = soundKind(press.deferred);
+    const position = positionOf(press.el);
+    feedback.key(kind, position);
+    feedback.keyUp(kind, position, 0.045);
     const sent = keyDown(press.deferred, { repeat: false });
     if (sent.code) keyUp(sent);
     else releaseLatched();
@@ -299,13 +338,16 @@ export function createKeyboard(root, { send, feedback, settings }) {
     try { el.setPointerCapture(event.pointerId); } catch { /* touch already ended */ }
     const def = defs.get(el);
     el.classList.add('pressed');
+    showPopup(event.pointerId, el, def);
 
     if (typesOnLift(def)) {
       presses.set(event.pointerId, { el, deferred: def, at: performance.now(), order: ++pressOrder });
       return;
     }
 
-    feedback.key(soundKind(def));
+    const kind = soundKind(def);
+    const position = positionOf(el);
+    feedback.key(kind, position);
     let press;
     if (def.kind === 'mod') {
       modifierDown(def);
@@ -317,7 +359,7 @@ export function createKeyboard(root, { send, feedback, settings }) {
     } else {
       press = keyDown(def);
     }
-    presses.set(event.pointerId, { el, ...press });
+    presses.set(event.pointerId, { el, sound: { kind, position }, ...press });
   });
 
   const end = (event) => {
@@ -325,6 +367,8 @@ export function createKeyboard(root, { send, feedback, settings }) {
     if (!press) return;
     presses.delete(event.pointerId);
     press.el.classList.remove('pressed');
+    hidePopup(event.pointerId);
+    if (press.sound) feedback.keyUp(press.sound.kind, press.sound.position);
     if (press.deferred) {
       const now = performance.now();
       if (!press.committed && event.type === 'pointerup' && now - press.at < REST_TIME) {
@@ -363,6 +407,7 @@ export function createKeyboard(root, { send, feedback, settings }) {
         press.el.classList.remove('pressed');
       }
       presses.clear();
+      [...popups.keys()].forEach(hidePopup);
       const codes = [...mods.keys()];
       mods.clear();
       codes.forEach(paintModifier);

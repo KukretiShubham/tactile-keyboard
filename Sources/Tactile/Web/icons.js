@@ -24,6 +24,7 @@ export const ICONS = {
   mute: svg(`${speaker}<line x1="15" y1="9.5" x2="20" y2="14.5"/><line x1="20" y1="9.5" x2="15" y2="14.5"/>`),
   volumeDown: svg(`${speaker}<path d="M14.6 9.6a3.4 3.4 0 0 1 0 4.8"/>`),
   volumeUp: svg(`${speaker}<path d="M14.6 9.6a3.4 3.4 0 0 1 0 4.8"/><path d="M17.2 7.2a6.8 6.8 0 0 1 0 9.6"/>`),
+  speaker: svg(`${speaker}<path d="M14.6 9.6a3.4 3.4 0 0 1 0 4.8"/><path d="M17.2 7.2a6.8 6.8 0 0 1 0 9.6"/>`),
   lockScreen: svg('<rect x="5.5" y="10.5" width="13" height="9" rx="2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/>'),
   globe: svg('<circle cx="12" cy="12" r="8.5"/><ellipse cx="12" cy="12" rx="3.6" ry="8.5"/><line x1="3.5" y1="12" x2="20.5" y2="12"/>'),
   arrowUp: svg('<path d="M12 8l5 7H7z"/>', true),

@@ -94,6 +94,8 @@ export function setupSheets({ connection, feedback }) {
     });
   }
 
+  document.getElementById('testSound').addEventListener('click', () => feedback.preview());
+
   const vibrationSwitch = document.getElementById('vibrationSwitch');
   if (!feedback.canVibrate) {
     vibrationSwitch.disabled = true;

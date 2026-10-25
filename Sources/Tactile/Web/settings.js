@@ -6,6 +6,7 @@ const DEFAULTS = {
   skin: 'midnight',
   glow: '#0A84FF',
   sound: true,
+  soundInSilentMode: false,
   soundProfile: 'soft',
   volume: 0.6,
   vibration: true,
@@ -17,6 +18,7 @@ const DEFAULTS = {
   keyboardPosition: 'top',
   keyboardSize: 'fit',
   restFingers: true,
+  keyPopups: true,
   keepAwake: true,
 };
 
