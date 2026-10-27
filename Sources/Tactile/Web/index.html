@@ -39,12 +39,18 @@
            MacBook's, with the status, buttons and shortcuts either side. -->
       <div class="palm">
         <aside class="palm-side" id="palmLeft" aria-label="Status and shortcuts">
+          <div class="palm-top" id="palmTop"></div>
           <div class="shortcut-keys" id="shortcutsLeft"></div>
         </aside>
         <section class="trackpad" id="trackpad" aria-label="Trackpad">
           <p class="trackpad-hint">Tap to click · Two fingers to scroll or pinch · Hold, then move to drag</p>
         </section>
-        <aside class="palm-side palm-right" id="palmRight" aria-label="Shortcuts and settings">
+        <aside class="palm-side palm-right" id="palmRight" aria-label="App hotkeys and settings">
+          <div class="pack-row">
+            <div class="pack-tabs" id="packTabs" role="group" aria-label="Apps"></div>
+            <button class="pack-tab pack-add" id="packAdd" aria-label="New Hotkey" title="New Hotkey">+</button>
+          </div>
+          <div class="pack-title" id="packTitle"></div>
           <div class="shortcut-keys" id="shortcutsRight"></div>
         </aside>
       </div>
@@ -106,6 +112,20 @@
         <div class="group" id="shortcutList"></div>
         <p class="group-footer">In landscape with the trackpad showing, shortcuts are keys on either side of the trackpad. Otherwise they sit along the top.</p>
 
+        <h3 class="group-title">App Hotkeys</h3>
+        <div class="group">
+          <label class="row"><span class="row-label">Follow My Mac's App</span><input type="checkbox" class="switch" data-setting="followMacApp"></label>
+        </div>
+        <p class="group-footer">Beside the trackpad, hotkeys for the app you're using on your Mac (VS Code, Zed, Xcode, JetBrains, browsers) appear on their own. In a terminal, the Claude Code or Codex tab you picked last stays. Tapping a tab brings that app to the front on your Mac; Claude Code and Codex come back wherever you used them last.</p>
+        <h3 class="group-title">Apps</h3>
+        <div class="group" id="packChoices"></div>
+        <p class="group-footer">Apps you switch off don't get a tab, even when they're in front on your Mac.</p>
+        <h3 class="group-title">My Hotkeys</h3>
+        <div class="group" id="customHotkeyList"></div>
+        <div class="group">
+          <button class="row row-button accent" id="newHotkeyButton">New Hotkey…</button>
+        </div>
+
         <h3 class="group-title">Feedback</h3>
         <div class="group">
           <label class="row"><span class="row-label">Key Sounds</span><input type="checkbox" class="switch" data-setting="sound"></label>
@@ -162,6 +182,31 @@
         </div>
         <p class="group-footer">You'll need the pairing code from your Mac to connect again.</p>
       </div>
+    </div>
+  </div>
+
+  <div class="scrim scrim-hotkey" id="hotkeySheet" hidden>
+    <div class="sheet hotkey-sheet glass" role="dialog" aria-modal="true" aria-labelledby="hotkeyTitle">
+      <div class="sheet-header">
+        <button class="header-button" data-close>Cancel</button>
+        <h2 id="hotkeyTitle">New Hotkey</h2>
+        <button class="header-button prominent" id="hotkeyAdd" disabled>Add</button>
+      </div>
+      <div class="hotkey-row">
+        <label class="hotkey-field"><span>Name</span><input id="hotkeyName" maxlength="24" autocomplete="off" placeholder="Rerun Tests"></label>
+        <div class="segmented" id="hotkeyKind">
+          <button data-value="keys" aria-pressed="true">Keys</button><button data-value="text" aria-pressed="false">Text</button>
+        </div>
+      </div>
+      <div class="hotkey-record" id="hotkeyRecord" aria-live="polite">
+        <span class="record-dot"></span><span class="record-keys" id="hotkeyKeys"></span>
+        <span class="record-hint">Press keys on the keyboard above</span>
+      </div>
+      <div class="hotkey-row" id="hotkeyTextRow" hidden>
+        <label class="hotkey-field"><span>Text</span><input id="hotkeyText" maxlength="200" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="/review"></label>
+        <label class="hotkey-enter"><span>Press Return</span><input type="checkbox" class="switch" id="hotkeyEnter" checked></label>
+      </div>
+      <div class="hotkey-apps" id="hotkeyApps" role="radiogroup" aria-label="Show for"></div>
     </div>
   </div>
 

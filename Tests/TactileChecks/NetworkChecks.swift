@@ -33,6 +33,9 @@ enum NetworkChecks {
                 let input = RecordingInput()
                 let server = try SocketServer(port: 0, appPort: 1, tls: nil, loopbackOnly: true, route: "Test",
                                               pairing: pairing, queue: queue, makeInput: { input })
+                let focused = NSLock()
+                var focusRequests: [String] = []
+                server.onFocusApp = { id, hint in focused.withLock { focusRequests.append(hint.map { "\(id) \($0)" } ?? id) } }
                 defer { queue.sync { server.stop() } }
                 let port = try require(waitFor { server.start(ready: $0) }, "port")
 
@@ -60,8 +63,15 @@ enum NetworkChecks {
                 socket.send(["t": "combo", "ks": ["MetaLeft", "NotAKey"]])
                 socket.send(["t": "sys", "k": "missionControl"])
                 socket.send(["t": "sys", "k": "formatDisk"])
+                socket.send(["t": "focus", "k": "com.example.Editor"])
+                socket.send(["t": "focus", "k": "com.example.Terminal", "s": "codex"])
+                socket.send(["t": "focus", "k": "com.example.Terminal", "s": "$(rm -rf ~)"])
+                socket.send(["t": "focus", "k": "../../etc/passwd"])
                 socket.send(["t": "ping"])
                 try expectEqual(socket.receive()?["t"] as? String, "pong", "reply to ping")
+                try expectEqual(focused.withLock { focusRequests },
+                                ["com.example.Editor", "com.example.Terminal codex", "com.example.Terminal"],
+                                "apps asked to come to the front (odd window hints dropped)")
                 try expectEqual(input.typed, ["down KeyA", "up KeyA", "down MetaLeft", "down KeyC", "up KeyC", "up MetaLeft",
                                                "system missionControl"], "input")
 

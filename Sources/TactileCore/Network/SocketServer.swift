@@ -33,11 +33,12 @@ public final class SocketServer {
         var y: Double?
         var r: Bool?
         var n: String?
-        /// Keys of a shortcut, e.g. ["MetaLeft", "KeyC"].
+        /// Keys of a shortcut, e.g. ["MetaLeft", "KeyC"]; or bundle IDs of apps
+        /// whose icons the page wants.
         var ks: [String]?
     }
 
-    private static let inputTypes: Set = ["kd", "ku", "mv", "md", "mu", "sc", "sys", "txt", "combo"]
+    private static let inputTypes: Set = ["kd", "ku", "mv", "md", "mu", "sc", "sys", "txt", "combo", "focus"]
 
     /// Shown next to device names, e.g. "iPad · Tailscale".
     let route: String
@@ -49,6 +50,10 @@ public final class SocketServer {
     var onChange: (() -> Void)?
     /// A device disconnected from the menu; it's refused until reconnected.
     var isHeld: (String) -> Bool = { _ in false }
+    /// A device asked for the app with this bundle ID to come to the front
+    /// (opening it if needed), from its app hotkey tabs; if given, its window
+    /// whose title includes the second string (e.g. "codex") comes first.
+    public var onFocusApp: ((String, String?) -> Void)?
     /// A device sent input (used to show "input flowing").
     var onInput: ((String) -> Void)?
     /// A device's measured round-trip time, in milliseconds.
@@ -58,8 +63,12 @@ public final class SocketServer {
 
     /// Set on the Tailscale route: only the Mac owner's devices get in.
     public var gate: TailnetGate?
-    /// What each key types on the Mac's layout, sent so the iPad can label keys.
-    var keyboardLabels: () -> [String: [String]] = { [:] }
+    /// Messages each device gets as soon as it connects, such as the Mac's
+    /// keyboard layout and the app in front (see `broadcast`).
+    var welcomeMessages: () -> [[String: Any]] = { [] }
+    /// Icons of the apps with these bundle IDs that are installed on the Mac,
+    /// as PNG data URLs. Calls back on any queue.
+    var appIcons: ([String], @escaping ([String: String]) -> Void) -> Void = { _, done in done([:]) }
 
     private let listener: NWListener
     private let queue: DispatchQueue
@@ -144,12 +153,10 @@ public final class SocketServer {
         clients.values.forEach { $0.input.releaseAll() }
     }
 
-    /// Sends the Mac's current key labels to every connected device.
-    func broadcastLabels() {
-        let labels = keyboardLabels()
-        guard !labels.isEmpty else { return }
+    /// Sends `payload` to every connected, paired device.
+    func broadcast(_ payload: [String: Any]) {
         for client in clients.values where client.deviceID != nil {
-            reply(client, ["t": "layout", "keys": labels])
+            reply(client, payload)
         }
     }
 
@@ -250,6 +257,16 @@ public final class SocketServer {
         let input = client.input
         switch message.t {
         case "ping": reply(client, ["t": "pong"])
+        case "icons":
+            // A short list of plausible bundle IDs; the reply has only the
+            // ones installed on this Mac.
+            guard let ids = message.ks, ids.count <= 64, ids.allSatisfy(Self.isBundleID) else { return }
+            appIcons(ids) { [weak self, weak client] icons in
+                self?.queue.async {
+                    guard let self, let client, self.clients[ObjectIdentifier(client)] != nil else { return }
+                    self.reply(client, ["t": "icons", "icons": icons])
+                }
+            }
         case "probe":
             if let sent = message.n.flatMap(Int.init) {
                 onLatency?(deviceID, max(0, Self.uptimeMilliseconds - sent))
@@ -269,6 +286,8 @@ public final class SocketServer {
                 input.combo(codes)
             }
         case "txt": if let text = message.s, text.count <= 4000 { input.type(text) }
+        case "focus":
+            if let id = message.k, Self.isBundleID(id) { onFocusApp?(id, message.s.flatMap(Self.windowHint)) }
         default: break
         }
         if Self.inputTypes.contains(message.t) && !isPaused() { onInput?(deviceID) }
@@ -314,8 +333,7 @@ public final class SocketServer {
         var payload = ["t": "ready", "name": HostInfo.computerName]
         if let token { payload["token"] = token }
         reply(client, payload)
-        let labels = keyboardLabels()
-        if !labels.isEmpty { reply(client, ["t": "layout", "keys": labels]) }
+        welcomeMessages().forEach { reply(client, $0) }
         Log.info("Connected \(device.name) (\(client.address))")
         onConnect?(device, token != nil)
         onChange?()
@@ -331,6 +349,15 @@ public final class SocketServer {
     private static func address(of connection: NWConnection) -> String {
         guard case let .hostPort(host, _) = connection.endpoint else { return "unknown" }
         return "\(host)".split(separator: "%").first.map(String.init) ?? "\(host)"
+    }
+
+    /// A short word to look for in window titles, or nil if it isn't one.
+    private static func windowHint(_ hint: String) -> String? {
+        (1...32).contains(hint.count) && hint.allSatisfy { $0.isLetter || $0.isNumber || $0 == " " || $0 == "-" } ? hint : nil
+    }
+
+    private static func isBundleID(_ id: String) -> Bool {
+        (1...128).contains(id.count) && id.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "." || $0 == "-") }
     }
 
     private static func isAllowedOrigin(_ origin: String, scheme: String, port: UInt16) -> Bool {

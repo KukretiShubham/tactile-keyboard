@@ -1,5 +1,6 @@
 import { ICONS } from './icons.js';
 import { settings } from './settings.js';
+import { glyphOf, isCustomHotkey } from './hotkeys.js';
 import { SHORTCUTS } from './shortcuts.js';
 import { el } from './util.js';
 
@@ -22,21 +23,49 @@ function miniKeyboard(skin) {
   return el('div', { className: 'mini-deck', attrs: { 'data-skin': skin } }, row(7), row(6), row(4));
 }
 
-export function setupSheets({ connection, feedback, typingModel }) {
-  const open = (sheet) => {
-    sheet.hidden = false;
-    requestAnimationFrame(() => sheet.classList.add('shown'));
-  };
-  const close = (sheet) => {
-    sheet.classList.remove('shown');
-    setTimeout(() => { sheet.hidden = true; }, 220);
-  };
+/** Shows a sheet (a `.scrim` holding a `.sheet`) with its animation. */
+export function openSheet(sheet) {
+  sheet.hidden = false;
+  requestAnimationFrame(() => sheet.classList.add('shown'));
+}
+
+export function closeSheet(sheet) {
+  sheet.classList.remove('shown');
+  setTimeout(() => { sheet.hidden = true; }, 220);
+}
+
+export function setupSheets({ connection, feedback, typingModel, onNewHotkey, packChoices }) {
+  const open = openSheet;
+  const close = closeSheet;
 
   document.querySelectorAll('[data-icon]').forEach((el) => { el.innerHTML = ICONS[el.dataset.icon]; });
 
   // Settings
   const settingsSheet = document.getElementById('settingsSheet');
-  document.getElementById('settingsButton').addEventListener('click', () => open(settingsSheet));
+  document.getElementById('settingsButton').addEventListener('click', () => {
+    renderPackChoices();
+    open(settingsSheet);
+  });
+
+  // A switch per app tab beside the trackpad, to hide the ones you don't use.
+  const packList = document.getElementById('packChoices');
+  function renderPackChoices() {
+    const packs = packChoices();
+    packList.replaceChildren(...packs.map((pack) => {
+      const toggle = el('input', { className: 'switch', attrs: { type: 'checkbox', 'aria-label': `Show ${pack.name}` } });
+      toggle.checked = !pack.hidden;
+      toggle.addEventListener('change', () => {
+        const hidden = new Set(settings.get('hiddenPacks') ?? []);
+        if (toggle.checked) hidden.delete(pack.id);
+        else hidden.add(pack.id);
+        settings.set('hiddenPacks', [...hidden]);
+      });
+      return el('label', { className: 'row' },
+        el('span', { className: 'row-label pack-choice' },
+          ...(pack.icon ? [el('img', { attrs: { src: pack.icon, alt: '' } })] : []), pack.name),
+        toggle);
+    }));
+  }
 
   const skinGrid = document.getElementById('skinGrid');
   for (const skin of SKINS) {
@@ -75,9 +104,32 @@ export function setupSheets({ connection, feedback, typingModel }) {
     });
     shortcutList.append(el('label', { className: 'row' },
       el('span', { className: 'row-label', text: shortcut.name }),
-      el('span', { className: 'row-detail', text: shortcut.glyph ?? '' }),
+      el('span', { className: 'row-detail', text: shortcut.sys ? '' : glyphOf(shortcut) }),
       toggle));
   }
+
+  // Hotkeys you made, each with a way to delete it.
+  const customList = document.getElementById('customHotkeyList');
+  function renderCustomHotkeys() {
+    const hotkeys = (settings.get('customHotkeys') ?? []).filter(isCustomHotkey);
+    customList.hidden = hotkeys.length === 0;
+    customList.replaceChildren(...hotkeys.map((hotkey) => {
+      const remove = el('button', { className: 'row-action destructive', text: 'Delete', attrs: { 'aria-label': `Delete ${hotkey.name}` } });
+      remove.addEventListener('click', () => {
+        settings.set('customHotkeys', settings.get('customHotkeys').filter(({ id }) => id !== hotkey.id));
+      });
+      return el('div', { className: 'row' },
+        el('span', { className: 'row-label', text: hotkey.name }),
+        el('span', { className: 'row-detail', text: glyphOf(hotkey) }),
+        remove);
+    }));
+  }
+  settings.subscribe((key) => { if (key === 'customHotkeys') renderCustomHotkeys(); });
+  renderCustomHotkeys();
+  document.getElementById('newHotkeyButton').addEventListener('click', () => {
+    close(settingsSheet);
+    onNewHotkey();
+  });
 
   const resetTyping = document.getElementById('resetTyping');
   resetTyping.addEventListener('click', () => {

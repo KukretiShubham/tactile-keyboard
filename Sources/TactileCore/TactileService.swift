@@ -62,6 +62,14 @@ public final class TactileService {
     private var tailscaleExpiry: Date?
     private var lastActive: [String: Date] = [:]
     private var keyboardLabels: [String: [String]] = [:]
+    private var frontApp: (id: String, name: String)?
+
+    /// Icons of installed apps by bundle ID, as PNG data URLs (see
+    /// `SocketServer.appIcons`). Set by the app, which can read them.
+    public var appIcons: ([String], @escaping ([String: String]) -> Void) -> Void = { _, done in done([:]) }
+    /// Brings the app with this bundle ID to the front, preferring its window
+    /// whose title includes the hint. Set by the app.
+    public var focusApp: (String, String?) -> Void = { _, _ in }
 
     private var stateObservers: [(Snapshot) -> Void] = []
     private var eventObservers: [(Event) -> Void] = []
@@ -198,8 +206,25 @@ public final class TactileService {
         queue.async {
             guard self.keyboardLabels != labels else { return }
             self.keyboardLabels = labels
-            self.sockets.forEach { $0.broadcastLabels() }
+            if let message = self.layoutMessage { self.sockets.forEach { $0.broadcast(message) } }
         }
+    }
+
+    /// The app in front on the Mac, so the iPad can show its hotkeys.
+    public func setFrontApp(id: String, name: String) {
+        queue.async {
+            guard self.frontApp?.id != id else { return }
+            self.frontApp = (id, name)
+            if let message = self.frontAppMessage { self.sockets.forEach { $0.broadcast(message) } }
+        }
+    }
+
+    private var layoutMessage: [String: Any]? {
+        keyboardLabels.isEmpty ? nil : ["t": "layout", "keys": keyboardLabels]
+    }
+
+    private var frontAppMessage: [String: Any]? {
+        frontApp.map { ["t": "app", "id": $0.id, "name": $0.name] }
     }
 
     public func setUseTailscale(_ value: Bool) {
@@ -311,7 +336,12 @@ public final class TactileService {
         socket.isHeld = { [weak self] id in self?.held.contains(id) ?? false }
         socket.onInput = { [weak self] id in self?.inputArrived(from: id) }
         socket.gate = gate
-        socket.keyboardLabels = { [weak self] in self?.keyboardLabels ?? [:] }
+        socket.welcomeMessages = { [weak self] in [self?.layoutMessage, self?.frontAppMessage].compactMap { $0 } }
+        socket.onFocusApp = { [weak self] id, hint in self?.focusApp(id, hint) }
+        socket.appIcons = { [weak self] ids, done in
+            guard let self else { return done([:]) }
+            self.appIcons(ids, done)
+        }
         socket.onLatency = { [weak self] id, ms in
             self?.latency[id] = ms
             self?.publish()

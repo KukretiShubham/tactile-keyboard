@@ -27,7 +27,8 @@ Put your Mac on a stand, keep the iPad in front of you, and type and point with 
 - **It learns your aim.** Glass has no edges to feel, so Tactile quietly learns where you actually press each key and shifts its touch area to match.
 - **Rest your fingers.** Fingers resting on the keys don't type; keys type when you lift. Rolled keys still come out in the right order.
 - **A proper trackpad.** Tap to click, two-finger click, two-finger scroll with momentum, pinch to zoom, drag, three-finger drag, and swipes for Spaces, Mission Control and App Exposé.
-- **Laid out like a MacBook.** In landscape the trackpad sits centred below the keyboard, and the palm rests either side hold big shortcut keys: Undo, Redo, Copy, Paste, Switch App, Screenshot, Mission Control, Spotlight and more. You pick which.
+- **Laid out like a MacBook.** In landscape the trackpad sits centred below the keyboard, and the palm rests either side hold big shortcut keys: Undo, Redo, Copy, Paste, Switch App, Spotlight and more. You pick which.
+- **Hotkeys for the apps you code in.** Ready-made keys for Claude Code, Codex, VS Code, Zed, Xcode, JetBrains IDEs and browsers, shown with each app's own icon. They switch to whichever app you're using on the Mac, and you can record your own.
 - **Private and secure.** Everything stays between your iPad and your Mac, encrypted with TLS. Pairing takes a one-time code, and over Tailscale only your own devices can connect.
 - **Nothing to patch.** No third-party packages on either side: Apple frameworks on the Mac, plain HTML, CSS and JavaScript on the iPad.
 
@@ -39,6 +40,10 @@ Put your Mac on a stand, keep the iPad in front of you, and type and point with 
 | **Silver**, with a key popup | **Frosted Glass**, keyboard only and expanded |
 | ![Floating keyboard in Space Black, smaller and centered with a drag handle](docs/images/floating.jpg) | ![Settings sheet with keyboard skins and glow colors](docs/images/settings.jpg) |
 | **Floating** keyboard: drag the handle to move it, the corner to resize it | **Settings**: skins, glow colors, sounds, trackpad and layout |
+
+Make your own hotkeys: record a key combination right on the keyboard, or send text like `/review`:
+
+<p align="center"><img src="docs/images/hotkeys.jpg" alt="The New Hotkey sheet recording Shift-Command-R from the keyboard above it, with app packs to choose from" width="700"></p>
 
 Midnight Glow comes in eight glow colors:
 
@@ -144,10 +149,33 @@ Tap the settings button (top right):
 
 - **Keyboard skin:** Midnight Glow (eight glow colors), Space Black, Silver, Frosted Glass, or Automatic.
 - **Keyboard:** Key Height, Function Row, Rest Fingers on Keys, Key Popups, **Adapt to My Typing** (with Reset Typing Learning), and **Match Mac Layout**.
-- **Shortcuts:** turn them on or off and choose which appear. In landscape with the trackpad they're keys on either side of the trackpad, half on each side; otherwise they sit along the top. Letter shortcuts follow your Mac's layout, so ⌘Z is still ⌘Z on AZERTY.
+- **Shortcuts:** turn them on or off and choose which appear. In landscape with the trackpad they're keys on the left of the trackpad; otherwise they sit along the top. Letter shortcuts follow your Mac's layout, so ⌘Z is still ⌘Z on AZERTY.
+- **App Hotkeys:** **Follow My Mac's App** switches the hotkeys beside the trackpad to the app in front on the Mac. **Apps** has a switch per app, to hide the tabs you don't use. **My Hotkeys** lists the hotkeys you made, to delete them.
 - **Feedback:** key sounds, Soft, Crisp or Thock, volume, Sound in Silent Mode, and vibration on devices that have it.
 - **Trackpad:** tracking speed, scrolling speed, natural scrolling, Pinch to Zoom, Three-Finger Drag.
 - **Layout:** keyboard, trackpad or both (in landscape, both gives the MacBook-style layout with the trackpad centred); keyboard at the top, middle or bottom; **Expanded** or **Floating** keyboard; **Keep Screen Awake** (the iPad stays on while you use it, and sleeps normally after 10 idle minutes).
+
+### App hotkeys
+
+In landscape with the trackpad showing, the right side of the trackpad has a row of app tabs and that app's hotkeys:
+
+| App | Hotkeys |
+|---|---|
+| Claude Code | Start (`claude`), Stop (esc), Rewind (esc esc), Switch Mode (⇧⇥), Search History (⌃R), Background (⌃B), `/clear`, `/compact` |
+| Codex | Start (`codex`), Edit Previous (esc esc), Search History (⌃R), Copy Output (⌃O), `/model`, `/new`, `/diff`, `/review` |
+| VS Code | Quick Open (⌘P), Commands (⇧⌘P), Terminal (⌃\`), Comment (⌘/), Sidebar (⌘B), Search (⇧⌘F) |
+| Zed | File Finder (⌘P), Commands (⇧⌘P), Terminal (⌃\`), Agent Panel (⌘?), Comment (⌘/), Search (⇧⌘F) |
+| Xcode | Build (⌘B), Run (⌘R), Stop (⌘.), Test (⌘U), Open Quickly (⇧⌘O), Clean (⇧⌘K) |
+| JetBrains IDEs | Search Everywhere (⇧⇧), Run (⌃R), Recent Files (⌘E), Context Actions (⌥↩), Reformat (⌥⌘L), Rename (⇧F6) |
+| Browsers | New Tab, Reopen Tab, Address Bar, Reload, Close Tab, Developer Tools |
+
+- A tab appears when its app is installed on your Mac, with the app's own icon (Tactile doesn't ship any app's logo). Claude Code and Codex can run in a terminal, so their tabs are always there.
+- The hotkeys follow the app in front on your Mac; a green dot shows they're following. The Claude and Codex desktop apps pick their packs too. In a terminal, the agent you picked last stays.
+- Tapping a tab brings that app to the front on your Mac (opening it if needed), so its hotkeys land in the right place. Claude Code and Codex come back wherever you used them last: their desktop app, or the terminal window running them (found by its title, which shows the running program).
+- **Start** opens a new window in your terminal and runs `claude` or `codex` there, so it never types into an agent that's already running.
+- Text hotkeys like `/clear` type the command and press Return.
+- Keys that open something close it with a second tap, and light up meanwhile: panels like VS Code's or Zed's terminal and Zed's Agent panel, browser developer tools, and palettes like Quick Open (which close with Esc, or by themselves once you type). Tactile can't see inside the app, so if you close a panel another way, the next tap opens it again.
+- Tap **+** to make your own: name it, then record keys on Tactile's keyboard (nothing reaches the Mac while recording) or type text, and choose which app it belongs to, or All Apps.
 
 ### The menu bar
 
@@ -168,7 +196,7 @@ Tactile can type on your Mac, so it's built to be careful:
 - **Paired, not open:** a new device needs a six-digit code that works once. Wrong guesses lock out quickly. Remembered devices hold a random 256-bit token that the Mac stores only as a hash, and expire after 90 days unused.
 - **Only your devices on Tailscale:** Tactile asks Tailscale who owns each device and refuses anything not signed in as you, before it can even try to pair.
 - **A limited certificate:** the local certificate authority can only vouch for `.local` names and private addresses, so it can't be used to impersonate websites.
-- **Nothing leaves your network:** no accounts, no analytics, no cloud service. What Adapt to My Typing learns stays on the iPad.
+- **Nothing leaves your network:** no accounts, no analytics, no cloud service. What Adapt to My Typing learns stays on the iPad. Your paired iPad is told the name of the app in front on the Mac, for app hotkeys.
 
 Found a security problem? Please report it privately, as described in [SECURITY.md](SECURITY.md).
 
@@ -202,7 +230,7 @@ swift run Tactile --help         # other options: --port, --no-tailscale, --forg
 | Folder | What's there |
 |---|---|
 | `Sources/TactileCore/` | Everything but the menu bar UI: pairing and certificates (`Security/`), the web and WebSocket servers (`Network/`), turning messages into keystrokes and pointer events (`Input/`), and shared helpers (`Support/`). |
-| `Sources/Tactile/` | The menu bar app. `Web/` is the iPad page: `keys.js` (layout), `keyboard.js` (typing), `typing-model.js` (learned touch areas), `trackpad.js`, `shortcuts.js`, `feedback.js` (sounds) and more. |
+| `Sources/Tactile/` | The menu bar app. `Web/` is the iPad page: `keys.js` (layout), `keyboard.js` (typing), `typing-model.js` (learned touch areas), `trackpad.js`, `shortcuts.js`, `packs.js` and `hotkeys.js` (app hotkeys), `hotkey-editor.js`, `feedback.js` (sounds) and more. |
 | `Tests/` | `TactileChecks/` (Swift checks) and `Web/` (tests for the page). |
 | `scripts/`, `Packaging/` | Building and signing `Tactile.app`. |
 

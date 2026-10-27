@@ -261,14 +261,15 @@ html { touch-action: none; }
   cursor: pointer;
   pointer-events: auto;
 }
+.shortcut-label { display: flex; align-items: center; min-width: 0; max-width: 100%; }
 .shortcut-glyph { font-variant-numeric: tabular-nums; }
 .shortcut-icon svg { display: block; }
 
 /* In the top bar: glass chips. Centred, but if the bar ever overflows, the
    first chip stays visible. */
+.shortcut-bar .shortcut-label { gap: 6px; }
 .shortcut-bar .shortcut {
   flex: none;
-  gap: 6px;
   height: 44px;
   padding: 0 14px;
   border-radius: 22px;
@@ -298,9 +299,11 @@ html { touch-action: none; }
   gap: var(--g);
 }
 .shortcut-keys .shortcut {
-  flex-direction: column;
+  position: relative;
+  /* The label sizes itself to the key (see the container queries below). */
+  container-type: size;
   justify-content: center;
-  gap: 6px;
+  overflow: hidden;
   min-height: 0;
   padding: 4px;
   border-radius: calc(var(--u) * 0.16);
@@ -319,8 +322,46 @@ html { touch-action: none; }
   box-shadow: var(--key-shadow-pressed);
   transition-duration: 40ms;
 }
-.shortcut-keys .shortcut-icon svg { width: 26px; height: 26px; }
-.shortcut-keys .shortcut-name { font-size: 12px; text-align: center; opacity: 0.75; }
+.shortcut-keys .shortcut-label { flex-direction: column; gap: clamp(2px, 6cqh, 6px); }
+.shortcut-keys .shortcut-glyph { font-size: clamp(13px, 30cqh, 22px); white-space: nowrap; }
+.shortcut-keys .shortcut-icon svg { width: clamp(16px, 34cqh, 26px); height: clamp(16px, 34cqh, 26px); }
+/* Short keys put the symbol and name side by side on one line. */
+@container (max-height: 54px) {
+  .shortcut-keys .shortcut-glyph, .shortcut-keys .shortcut-text { font-size: 15px; }
+  .shortcut-keys .shortcut-icon svg { width: 18px; height: 18px; }
+  .shortcut-keys .shortcut-name { font-size: 12px; }
+}
+@container (max-height: 54px) and (min-width: 100px) {
+  .shortcut-keys .shortcut-label { flex-direction: row; gap: 7px; }
+}
+/* Very small keys show only the symbol (the name is still read out by VoiceOver). */
+@container (max-height: 30px) {
+  .shortcut-keys .shortcut-name { display: none; }
+}
+/* Switched on (a panel it opened is showing): tap again to close. */
+.shortcut-keys .shortcut.on { background: var(--key-bg-on); border-color: var(--key-border-pressed); }
+.shortcut-keys .shortcut.on::after {
+  content: "";
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
+}
+[data-skin="midnight"] .shortcut-keys .shortcut.on::after { background: var(--glow); box-shadow: 0 0 6px var(--glow); }
+.shortcut-bar .shortcut.on { box-shadow: inset 0 0 0 2px var(--accent), var(--glass-shadow); }
+.shortcut-keys .shortcut-name {
+  max-width: 100%;
+  font-size: clamp(10px, 17cqh, 12px);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.75;
+}
 [data-skin="midnight"] .shortcut-keys .shortcut-glyph { filter: drop-shadow(0 0 6px var(--glow)); }
 .row-detail { margin-left: auto; color: var(--text-2); font-size: 15px; }
 
@@ -351,6 +392,170 @@ html { touch-action: none; }
   min-height: 0;
 }
 .palm-right { align-items: flex-end; }
+/* Status and buttons share the left palm rest's top row. */
+.palm-top { align-self: stretch; display: flex; align-items: center; gap: 10px; min-width: 0; }
+.palm-top .status { flex: 1; min-width: 0; }
+.palm-top .toolbar-actions { flex: none; }
+
+/* App tabs above the app's hotkeys, with + to make a hotkey. The tabs scroll
+   sideways if there are more apps than room; the green dot means the pack is
+   following the Mac. */
+.pack-row { align-self: stretch; display: flex; gap: 8px; min-width: 0; }
+.pack-row:has(.pack-tabs:empty) { display: none; }
+.pack-tabs {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  touch-action: pan-x;
+  /* Room for the selected tab's ring and dot. */
+  padding: 4px;
+  margin: -4px;
+}
+.pack-tabs::-webkit-scrollbar { display: none; }
+.pack-title:empty { display: none; }
+.pack-tab {
+  flex: none;
+  position: relative;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--key-bg);
+  border: 1px solid var(--key-border);
+  box-shadow: var(--key-shadow);
+  color: var(--legend);
+  font: 600 16px/1 var(--font);
+  cursor: pointer;
+  touch-action: pan-x;
+}
+.pack-tab img { width: 30px; height: 30px; display: block; pointer-events: none; }
+.pack-tab.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent), var(--key-shadow); }
+[data-skin="midnight"] .pack-tab.on { border-color: var(--glow); box-shadow: 0 0 0 2px var(--glow), 0 0 14px var(--glow); }
+.pack-add { font-size: 26px; font-weight: 300; }
+.pack-following {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--green);
+  border: 2px solid var(--deck-bg, #000);
+}
+.pack-title {
+  align-self: stretch;
+  margin: -4px 2px -6px;
+  font: 600 13px/1.2 var(--font);
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pack-title small { font-size: 13px; font-weight: 500; color: var(--text-2); }
+.shortcut-keys .shortcut-text { font: 400 clamp(12px, 26cqh, 17px)/1 ui-monospace, Menlo, monospace; }
+.shortcut-bar .shortcut-text { font-family: ui-monospace, Menlo, monospace; }
+
+/* New Hotkey sheet: placed away from the keyboard (by hotkey-editor.js),
+   which stays usable for recording. */
+.scrim-hotkey { padding: 16px; }
+.sheet.hotkey-sheet {
+  width: min(620px, 100%);
+  padding: 0 18px 18px;
+  gap: 12px;
+  align-items: stretch;
+  text-align: left;
+}
+.hotkey-sheet .sheet-header { padding: 8px 0 0; }
+.hotkey-row { display: flex; gap: 10px; align-items: center; }
+.hotkey-row[hidden] { display: none; }
+.hotkey-field {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  border-radius: 12px;
+  background: var(--group);
+  color: var(--text-2);
+  font-size: 15px;
+}
+.hotkey-field input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: 400 17px/1 var(--font);
+  outline: none;
+}
+.hotkey-row .segmented { flex: none; }
+.hotkey-enter { display: flex; align-items: center; gap: 10px; color: var(--text); font-size: 15px; }
+.hotkey-record {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  border-radius: 14px;
+  background: var(--group);
+  border: 1.5px dashed var(--accent);
+}
+.hotkey-record[hidden] { display: none; }
+.record-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--red); box-shadow: 0 0 8px var(--red); }
+.record-keys { display: flex; gap: 8px; }
+.record-cap {
+  min-width: 46px;
+  height: 40px;
+  padding: 0 10px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--key-bg);
+  border: 1px solid var(--key-border-pressed);
+  box-shadow: var(--key-shadow);
+  color: var(--legend);
+  font: 500 19px/1 var(--font);
+}
+.record-hint { margin-left: auto; color: var(--text-2); font-size: 13px; text-align: right; }
+.hotkey-record.empty .record-hint { margin-left: 0; }
+.hotkey-apps {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  overflow-x: auto;
+  scrollbar-width: none;
+  touch-action: pan-x;
+}
+.hotkey-apps::-webkit-scrollbar { display: none; }
+.hotkey-app, .hotkey-apps-label { flex: none; }
+.hotkey-apps-label { color: var(--text-2); font-size: 15px; margin-right: 4px; }
+.hotkey-app {
+  height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 18px;
+  background: var(--group);
+  color: var(--text);
+  font: 500 14px/1 var(--font);
+  cursor: pointer;
+}
+.hotkey-app:has(img) { padding-left: 6px; }
+.hotkey-app img { width: 24px; height: 24px; }
+.hotkey-app[aria-checked="true"] { box-shadow: inset 0 0 0 2px var(--accent); }
+
+.pack-choice { display: flex; align-items: center; gap: 10px; }
+.pack-choice img { width: 28px; height: 28px; }
+.row-action { border: none; background: none; font-size: 15px; cursor: pointer; padding: 6px 0 6px 12px; }
 [data-controls="palm"] .trackpad-hint { bottom: 12px; }
 
 /* ───────────────────────── Stage ───────────────────────── */

@@ -51,7 +51,12 @@ export function fakeSettings(overrides = {}) {
     soundProfile: 'soft', volume: 0, vibration: false, tracking: 1, scrollSpeed: 1,
     naturalScroll: true, pinchZoom: true, threeFingerDrag: false, ...overrides,
   };
-  return { get: (key) => values[key], set: (key, value) => { values[key] = value; }, subscribe() {} };
+  const listeners = new Set();
+  return {
+    get: (key) => values[key],
+    set: (key, value) => { values[key] = value; listeners.forEach((listener) => listener(key, value)); },
+    subscribe: (listener) => listeners.add(listener),
+  };
 }
 
 /** Storage stand-in that keeps values in memory. */

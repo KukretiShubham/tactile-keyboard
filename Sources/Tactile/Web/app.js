@@ -4,7 +4,8 @@ import { createFloating, HANDLE_SPACE } from './floating.js';
 import { createKeyboard } from './keyboard.js';
 import { settings, storage } from './settings.js';
 import { setupSheets } from './sheets.js';
-import { createShortcuts } from './shortcuts.js';
+import { createHotkeyEditor } from './hotkey-editor.js';
+import { createShortcuts, PACK_ICON_APPS } from './shortcuts.js';
 import { createTrackpad } from './trackpad.js';
 import { TypingModel } from './typing-model.js';
 import { clamp, contentBox } from './util.js';
@@ -18,8 +19,7 @@ const statusLabel = document.getElementById('statusLabel');
 const soundHint = document.getElementById('soundHint');
 const toolbar = document.querySelector('.toolbar');
 const toolbarActions = document.querySelector('.toolbar-actions');
-const palmLeft = document.getElementById('palmLeft');
-const palmRight = document.getElementById('palmRight');
+const palmTop = document.getElementById('palmTop');
 const themeColor = document.querySelector('meta[name="theme-color"]');
 const prefersDark = matchMedia('(prefers-color-scheme: dark)');
 
@@ -36,7 +36,18 @@ let pairingLinkUsed = false;
 
 const deck = document.getElementById('keyboard');
 const typingModel = new TypingModel(storage);
-const keyboard = createKeyboard(deck, { send, feedback, settings, model: typingModel });
+// Typing or clicking closes any palette a hotkey opened (see shortcuts.js).
+const sendInput = (message) => {
+  if (message.t === 'kd' || message.t === 'md') shortcuts.noteInput();
+  send(message);
+};
+// While a new hotkey is being recorded, the keyboard's presses go to the
+// recorder instead of the Mac.
+let recordKeys = null;
+const keyboard = createKeyboard(deck, {
+  send: (message) => (recordKeys ? recordKeys(message) : sendInput(message)),
+  feedback, settings, model: typingModel,
+});
 // While the handle or grip is being dragged, the keyboard follows this frame;
 // it's saved when the finger lifts.
 let liveFrame = null;
@@ -47,7 +58,7 @@ const floating = createFloating({
   minWidth: () => floatMinWidth,
 });
 const trackpad = createTrackpad(document.getElementById('trackpad'), {
-  send, feedback, settings,
+  send: sendInput, feedback, settings,
   onClick: () => keyboard.releaseLatched(),
   isCongested: () => connection.congested,
 });
@@ -55,11 +66,31 @@ const shortcuts = createShortcuts({
   bar: document.getElementById('shortcutBar'),
   left: document.getElementById('shortcutsLeft'),
   right: document.getElementById('shortcutsRight'),
+  tabs: document.getElementById('packTabs'),
+  title: document.getElementById('packTitle'),
+  add: document.getElementById('packAdd'),
 }, {
   send, feedback, settings,
   beforeSend: () => keyboard.releaseLatched(),
+  onAddHotkey: (pack) => hotkeyEditor.open(pack),
 });
-const sheets = setupSheets({ connection, feedback, typingModel });
+const hotkeyEditor = createHotkeyEditor({
+  settings, feedback, deck,
+  packs: () => shortcuts.packs(),
+  record: (handler) => {
+    if (!handler && recordKeys) keyboard.reset();
+    recordKeys = handler;
+  },
+});
+const sheets = setupSheets({
+  connection, feedback, typingModel,
+  onNewHotkey: () => hotkeyEditor.open(),
+  packChoices: () => shortcuts.offered(),
+});
+
+// App hotkeys follow the app in front on the Mac, with icons from its apps.
+connection.addEventListener('app', ({ detail }) => shortcuts.setFrontApp({ id: detail.id, name: detail.name }));
+connection.addEventListener('icons', ({ detail }) => shortcuts.setIcons(detail.icons ?? {}));
 
 // Key labels and shortcuts follow the Mac's keyboard layout.
 let macLabels = {};
@@ -68,7 +99,7 @@ function applyLabels() {
   shortcuts.setLabels(macLabels);
 }
 connection.addEventListener('layout', ({ detail }) => {
-  macLabels = detail;
+  macLabels = detail.keys ?? {};
   applyLabels();
 });
 
@@ -161,8 +192,8 @@ function placeControls(onPalmRests) {
   if (onPalmRests === controlsOnPalmRests) return;
   controlsOnPalmRests = onPalmRests;
   if (onPalmRests) {
-    palmLeft.prepend(status, soundHint);
-    palmRight.prepend(toolbarActions);
+    palmTop.append(status, toolbarActions);
+    palmTop.after(soundHint);
   } else {
     toolbar.prepend(status, soundHint);
     toolbar.append(toolbarActions);
@@ -199,7 +230,10 @@ connection.addEventListener('state', ({ detail: state }) => {
       sheets.showPairing();
     }
   }
-  if (state === 'ready') sheets.hidePairing();
+  if (state === 'ready') {
+    sheets.hidePairing();
+    send({ t: 'icons', ks: PACK_ICON_APPS });
+  }
   if (state !== 'ready') {
     keyboard.reset();
     trackpad.reset();
@@ -249,7 +283,7 @@ for (const type of ['gesturestart', 'gesturechange', 'gestureend']) {
 }
 document.addEventListener('contextmenu', (event) => event.preventDefault());
 document.addEventListener('touchmove', (event) => {
-  if (!event.target.closest('.sheet-scroll, textarea')) event.preventDefault();
+  if (!event.target.closest('.sheet-scroll, textarea, .pack-tabs, .hotkey-apps')) event.preventDefault();
 }, { passive: false });
 
 connection.start();

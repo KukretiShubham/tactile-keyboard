@@ -136,6 +136,31 @@ export function buildKeys(root) {
   return { defs, elements };
 }
 
+// How keys are written on Mac menus and keycaps, for hotkey glyphs.
+const KEY_SYMBOLS = {
+  Escape: 'esc', Tab: '⇥', Enter: '↩', Backspace: '⌫', Delete: '⌦', Space: 'space', CapsLock: '⇪',
+  ArrowLeft: '←', ArrowRight: '→', ArrowUp: '↑', ArrowDown: '↓', Home: '↖', End: '↘', PageUp: '⇞', PageDown: '⇟',
+};
+const MODIFIER_SYMBOLS = [['Control', '⌃'], ['Alt', '⌥'], ['Shift', '⇧'], ['Meta', '⌘']];
+
+export const isModifier = (code) => /^(Control|Alt|Shift|Meta)(Left|Right)$/.test(code);
+
+/**
+ * A key combination written the Mac way, modifiers first in Apple's order:
+ * ['MetaLeft', 'ShiftLeft', 'p'] → "⇧⌘P". Keys are codes, or single characters.
+ */
+export function comboGlyph(keys) {
+  const held = MODIFIER_SYMBOLS
+    .filter(([name]) => keys.some((key) => isModifier(key) && key.startsWith(name)))
+    .map(([, symbol]) => symbol);
+  const rest = keys.filter((key) => !isModifier(key)).map((key) => {
+    if (key.length === 1) return key.toUpperCase();
+    if (KEY_SYMBOLS[key]) return KEY_SYMBOLS[key];
+    return US_LABELS[key]?.[0].toUpperCase() ?? key;
+  });
+  return [...held, ...rest].join('');
+}
+
 /**
  * The key that types `character` (unshifted) on the Mac's layout, given the
  * labels from the Mac; falls back to its US position.

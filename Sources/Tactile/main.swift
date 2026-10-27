@@ -98,6 +98,19 @@ let layoutObserver = DistributedNotificationCenter.default().addObserver(
     forName: Notification.Name(kTISNotifySelectedKeyboardInputSourceChanged as String), object: nil, queue: .main
 ) { _ in service.setKeyboardLabels(KeyboardLayout.currentLabels()) }
 
+// The iPad shows hotkeys for the app in front, with icons read from the apps
+// themselves.
+service.appIcons = { ids, done in DispatchQueue.main.async { done(AppIcons.dataURLs(for: ids)) } }
+service.focusApp = { id, hint in DispatchQueue.main.async { AppFocus.bring(id, window: hint) } }
+func reportFrontApp(_ app: NSRunningApplication?) {
+    guard let app, let id = app.bundleIdentifier, id != Bundle.main.bundleIdentifier else { return }
+    service.setFrontApp(id: id, name: app.localizedName ?? id)
+}
+reportFrontApp(NSWorkspace.shared.frontmostApplication)
+let frontAppObserver = NSWorkspace.shared.notificationCenter.addObserver(
+    forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
+) { note in reportFrontApp(note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication) }
+
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)
 let menuBar = MenuBarController(service: service, isApp: isApp)

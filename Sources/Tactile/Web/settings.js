@@ -29,6 +29,13 @@ const DEFAULTS = {
   macLabels: true,
   shortcutBar: true,
   shortcuts: DEFAULT_SHORTCUTS,
+  pack: 'claude',
+  terminalPack: 'claude',
+  lastTerminal: 'com.apple.Terminal',
+  agentHomes: {},
+  hiddenPacks: [],
+  followMacApp: true,
+  customHotkeys: [],
   keepAwake: true,
 };
 
@@ -44,9 +51,15 @@ export const storage = {
   },
 };
 
+// The general shortcuts before app hotkeys arrived. Anyone who kept them gets
+// the new, shorter default, which leaves room for app hotkeys beside it.
+const EARLIER_DEFAULT = 'undo,redo,copy,paste,switchApp,screenshot,missionControl,spotlight';
+
 function load() {
   try {
-    return { ...DEFAULTS, ...JSON.parse(storage.get(KEY) || '{}') };
+    const saved = JSON.parse(storage.get(KEY) || '{}');
+    if (Array.isArray(saved.shortcuts) && saved.shortcuts.join(',') === EARLIER_DEFAULT) saved.shortcuts = DEFAULT_SHORTCUTS;
+    return { ...DEFAULTS, ...saved };
   } catch {
     return { ...DEFAULTS };
   }
