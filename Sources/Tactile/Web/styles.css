@@ -356,6 +356,8 @@ html { touch-action: none; }
 .shortcut-keys .shortcut-name {
   max-width: 100%;
   font-size: clamp(10px, 17cqh, 12px);
+  /* Room for descenders (g, p, y), which the ellipsis's clipping would cut. */
+  line-height: 1.3;
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
