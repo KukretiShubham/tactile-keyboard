@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/midnight.jpg" alt="Tactile on an iPad in landscape: a full Mac keyboard with glowing blue key edges, and below it a centred trackpad with large shortcut keys on either side" width="900">
+  <img src="docs/images/silver.jpg" alt="Tactile on an iPad in landscape in the Silver skin: a white Mac keyboard with a key popup, and below it a centred trackpad with shortcut keys on the left and Zed's hotkeys on the right, under a row of app tabs" width="900">
 </p>
 
 Put your Mac on a stand, keep the iPad in front of you, and type and point with it like a laptop. Tactile is a tiny menu bar app for the Mac and a web page for the iPad. Scan a QR code and you're typing; there's nothing to install from the App Store.
@@ -36,8 +36,8 @@ Put your Mac on a stand, keep the iPad in front of you, and type and point with 
 
 | | |
 |---|---|
-| ![Silver skin: white keys with a key popup showing the letter a](docs/images/silver.jpg) | ![Frosted Glass skin: translucent keys over a colorful background, keyboard only](docs/images/frosted.jpg) |
-| **Silver**, with a key popup | **Frosted Glass**, keyboard only and expanded |
+| ![Midnight Glow skin: dark keys with glowing blue edges, with Claude Code's hotkeys beside the trackpad](docs/images/midnight.jpg) | ![Frosted Glass skin: translucent keys over a colorful background, keyboard only](docs/images/frosted.jpg) |
+| **Midnight Glow**, with Claude Code's hotkeys | **Frosted Glass**, keyboard only and expanded |
 | ![Floating keyboard in Space Black, smaller and centered with a drag handle](docs/images/floating.jpg) | ![Settings sheet with keyboard skins and glow colors](docs/images/settings.jpg) |
 | **Floating** keyboard: drag the handle to move it, the corner to resize it | **Settings**: skins, glow colors, sounds, trackpad and layout |
 
