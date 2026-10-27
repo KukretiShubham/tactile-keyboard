@@ -2,6 +2,10 @@
 
 What changed in each release of Tactile. Each release's download is on the [releases page](https://github.com/KukretiShubham/tactile-keyboard/releases).
 
+## Unreleased
+
+- Explain in Trackpad settings and troubleshooting how to disable iPadOS Productivity Gestures when three-finger swipes show Undo/Redo instead of switching Mac desktops.
+
 ## 1.1.0
 
 - **App hotkeys.** Keys beside the trackpad for Claude Code, Codex, VS Code, Zed, Xcode, JetBrains IDEs and browsers, shown with each app's own icon from your Mac. They follow the app in front, tapping a tab brings that app forward, and you can hide the ones you don't use.
