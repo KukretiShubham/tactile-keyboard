@@ -130,7 +130,13 @@ enum SecurityChecks {
             for address in ["8.8.8.8", "1.1.1.1", "172.32.0.1", "100.128.0.1", "192.169.0.1", "not an address"] {
                 try expect(!LocalAuthority.isPermitted(address), "\(address) is refused")
             }
+            // OpenSSL refuses names over 64 characters; long Mac names must still work.
+            let long = LocalAuthority.authorityName(for: String(repeating: "Studio Mac ", count: 10))
+            try expect(long.count <= 64 && long.hasPrefix("Tactile CA - Studio Mac"), "long Mac name: \(long)")
+            try expectEqual(LocalAuthority.authorityName(for: "🍎 "), "Tactile CA - Mac", "a name with nothing usable")
             try withTemporaryDirectory { folder in
+                let longHost = String(repeating: "studio-mac-", count: 6) + ".local"
+                _ = try LocalAuthority.prepare(hostName: longHost, addresses: [], directory: folder.appendingPathComponent("long"))
                 let authority = try LocalAuthority.prepare(hostName: "test-mac.local", addresses: ["192.168.1.20", "8.8.8.8"],
                                                            directory: folder.appendingPathComponent("tls"))
                 let ca = try describe(authority.caDER, in: folder)

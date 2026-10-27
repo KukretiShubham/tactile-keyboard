@@ -11,7 +11,7 @@ What changed in each release of Tactile. Each release's download is on the [rele
 - **Safer pairing:** the pairing code only travels in HTTPS links. With Tailscale one scan still pairs; on Wi-Fi only you type the code once.
 - **Faster start:** Tactile works on Wi-Fi straight away and adds the Tailscale address when its certificate arrives, instead of waiting for it.
 - Hotkey labels fit any key height; the status and buttons share a row on the left.
-- Fixes: a device you disconnected from the menu now sees "Disconnected by your Mac" instead of "Mac not reachable".
+- Fixes: a device you disconnected from the menu now sees "Disconnected by your Mac" instead of "Mac not reachable"; Tactile now starts on Macs with very long names (certificate names were over OpenSSL's 64-character limit).
 
 ## 1.0.0
 

@@ -113,7 +113,9 @@ public struct LocalAuthority {
         """.write(to: ext, atomically: true, encoding: .utf8)
 
         try OpenSSL.run(["ecparam", "-name", "prime256v1", "-genkey", "-noout", "-out", key.path])
-        try OpenSSL.run(["req", "-new", "-key", key.path, "-subj", "/CN=\(names.last!)", "-out", csr.path])
+        // Browsers check the names listed above, not the common name; a fixed
+        // one keeps within OpenSSL's 64-character limit for any host name.
+        try OpenSSL.run(["req", "-new", "-key", key.path, "-subj", "/CN=Tactile", "-out", csr.path])
         try OpenSSL.run(["x509", "-req", "-in", csr.path, "-CA", caCert.path, "-CAkey", caKey.path,
                          "-set_serial", "0x\(SecureRandom.hex(bytes: 16))", "-days", "397", "-sha256",
                          "-extfile", ext.path, "-extensions", "v3", "-out", cert.path])
@@ -126,10 +128,17 @@ public struct LocalAuthority {
                               fingerprint: caDER.sha256.fingerprint())
     }
 
-    private static var authorityName: String {
-        let mac = HostInfo.computerName.unicodeScalars
+    private static var authorityName: String { authorityName(for: HostInfo.computerName) }
+
+    /// The CA's name as the iPad shows it, e.g. "Tactile CA - Studio Mac":
+    /// letters, digits, spaces and hyphens only, and within OpenSSL's
+    /// 64-character limit however long the Mac's name is.
+    public static func authorityName(for computerName: String) -> String {
+        let prefix = "Tactile CA - "
+        let kept = computerName.unicodeScalars
             .filter { CharacterSet.alphanumerics.contains($0) || $0 == " " || $0 == "-" }
-        return "Tactile CA - \(String(String.UnicodeScalarView(mac)))"
+        let mac = String(String.UnicodeScalarView(kept)).prefix(64 - prefix.count).trimmingCharacters(in: .whitespaces)
+        return prefix + (mac.isEmpty ? "Mac" : mac)
     }
 
     private static func createAuthority(key: URL, cert: URL) throws {
