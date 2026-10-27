@@ -16,7 +16,12 @@ public final class TactileService {
         public var onlyMyDevices: Bool
         public var code: String
         public var setupURLs: [String]
+        /// What the pairing QR code opens. It carries the pairing code only
+        /// when it's an HTTPS address (Tailscale), so the code never passes
+        /// through the plain-HTTP setup page.
         public var pairingLink: String
+        /// Whether scanning the QR code also pairs (otherwise the code is typed).
+        public var pairsOnScan: Bool
         public var localURL: String
         public var tailscaleURL: String?
         public var fingerprint: String
@@ -34,8 +39,6 @@ public final class TactileService {
     }
 
     public enum Event {
-        case started
-        case newCode
         case paired(Pairing.Device)
         case connected(Pairing.Device)
     }
@@ -50,6 +53,8 @@ public final class TactileService {
 
     private var local: LocalAuthority?
     private var tailscaleURL: String?
+    /// Counts starts, so a Tailscale certificate that arrives after a restart is ignored.
+    private var starts = 0
     private var pages: [HTTPServer] = []
     private var sockets: [SocketServer] = []
     private var running = false
@@ -85,10 +90,7 @@ public final class TactileService {
         self.dryRun = dryRun
         self.useTailscale = useTailscale
         self.onlyMyDevices = onlyMyDevices
-        pairing.onNewCode = { [weak self] in
-            self?.publish()
-            self?.emit(.newCode)
-        }
+        pairing.onNewCode = { [weak self] in self?.publish() }
         pairing.onDevicesChanged = { [weak self] in self?.publish() }
     }
 
@@ -118,6 +120,8 @@ public final class TactileService {
         let setupURLs = hosts.map { "http://\($0):\(setupPort)" }
         let host = hosts.first ?? "localhost"
         let connected = Set(sockets.flatMap(\.connectedDeviceIDs))
+        let setupPage = setupURLs.first ?? "http://localhost:\(setupPort)"
+        let pairingLink = running ? tailscaleURL.map { "\($0)#pair=\(pairing.code)" } ?? setupPage : setupPage
         var ports = "\(localPorts.app)–\(localPorts.socket)"
         if tailscaleURL != nil { ports += " · Tailscale \(tailscalePorts.app)–\(tailscalePorts.socket)" }
         return Snapshot(
@@ -129,7 +133,8 @@ public final class TactileService {
             onlyMyDevices: onlyMyDevices,
             code: pairing.code,
             setupURLs: setupURLs,
-            pairingLink: "\(setupURLs.first ?? "http://localhost:\(setupPort)")/#pair=\(pairing.code)",
+            pairingLink: pairingLink,
+            pairsOnScan: running && tailscaleURL != nil,
             localURL: "https://\(host):\(localPorts.app)",
             tailscaleURL: running ? tailscaleURL : nil,
             fingerprint: local?.fingerprint ?? "",
@@ -244,36 +249,23 @@ public final class TactileService {
         }
     }
 
-    public func revokeAll() {
-        queue.async {
-            self.pairing.revokeAll()
-            self.sockets.forEach { $0.disconnect(deviceID: nil) }
-            Log.info("Revoked all paired devices.")
-        }
-    }
-
     // MARK: Lifecycle (on the queue)
 
     private func startNow() {
         guard !running else { return }
+        starts += 1
         do {
             // The local certificate authority is made once; a fresh server
             // certificate is issued on every start for the current addresses.
             let local = try LocalAuthority.prepare(hostName: HostInfo.bonjourName, addresses: HostInfo.ipv4Addresses)
             self.local = local
-            let tailscale = useTailscale ? Tailscale.certificate() : nil
-            HostInfo.tailscaleName = tailscale?.host
-            tailscaleExpiry = tailscale?.expires
-            tailscaleURL = tailscale.map { "https://\($0.host):\(tailscalePorts.app)/" }
+            HostInfo.tailscaleName = nil
+            tailscaleExpiry = nil
+            tailscaleURL = nil
 
             pages = [try setupServer(local: local)]
             sockets = []
             try addApp(local.identity, ports: localPorts, route: "Wi-Fi")
-            if let tailscale {
-                let gate = TailnetGate(ownerID: tailscale.ownerID)
-                gate.isEnabled = { [weak self] in self?.onlyMyDevices ?? true }
-                try addApp(tailscale.identity, ports: tailscalePorts, route: "Tailscale", gate: gate)
-            }
             // Lets a browser on this Mac try the UI without trusting the
             // certificate. Input is only logged in a dry run.
             if dryRun { try addApp(nil, ports: devPorts, route: "Dry run") }
@@ -286,7 +278,35 @@ public final class TactileService {
         running = true
         Log.info("Tactile started.")
         publish()
-        emit(.started)
+
+        // Tailscale can take a while to issue a certificate, so Wi-Fi works
+        // (and the menu responds) meanwhile; the Tailscale address joins later.
+        guard useTailscale else { return }
+        let start = starts
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            let certificate = Tailscale.certificate()
+            self?.queue.async { self?.tailscaleArrived(certificate, start: start) }
+        }
+    }
+
+    /// Adds the Tailscale address, unless Tactile stopped or restarted since.
+    private func tailscaleArrived(_ tailscale: Tailscale.Certificate?, start: Int) {
+        guard let tailscale, running, start == starts, let local else { return }
+        HostInfo.tailscaleName = tailscale.host
+        tailscaleExpiry = tailscale.expires
+        tailscaleURL = "https://\(tailscale.host):\(tailscalePorts.app)/"
+        let gate = TailnetGate(ownerID: tailscale.ownerID)
+        gate.isEnabled = { [weak self] in self?.onlyMyDevices ?? true }
+        do {
+            let added = try addApp(tailscale.identity, ports: tailscalePorts, route: "Tailscale", gate: gate)
+            added.page.start()
+            added.socket.start()
+        } catch {
+            Log.warn("Couldn't serve the Tailscale address: \(error)")
+            tailscaleURL = nil
+        }
+        pages.first?.setAsset(setupInfo(local: local), at: "/setup.json")
+        publish()
     }
 
     private func stopNow() {
@@ -308,18 +328,24 @@ public final class TactileService {
         // whichever secure address it can use.
         var setup = assets.filter { $0.key.hasPrefix("/setup/") || $0.key == "/icon.svg" || $0.key == "/apple-touch-icon.png" }
         setup["/index.html"] = assets["/setup/index.html"]
-        var info: [String: Any] = ["appPort": Int(localPorts.app), "fingerprint": local.fingerprint, "caName": local.caName]
-        if let tailscaleURL { info["tailscaleURL"] = tailscaleURL }
-        setup["/setup.json"] = HTTPServer.json(info)
+        setup["/setup.json"] = setupInfo(local: local)
         setup["/tactile-ca.crt"] = HTTPServer.Asset(body: local.caDER, type: "application/x-x509-ca-cert")
         return try HTTPServer(port: setupPort, tls: nil, assets: setup,
                               policy: "\(basePolicy); connect-src 'self' https:", queue: queue)
     }
 
+    /// What the setup page needs: where to send the iPad, and the certificate to check.
+    private func setupInfo(local: LocalAuthority) -> HTTPServer.Asset {
+        var info: [String: Any] = ["appPort": Int(localPorts.app), "fingerprint": local.fingerprint, "caName": local.caName]
+        if let tailscaleURL { info["tailscaleURL"] = tailscaleURL }
+        return HTTPServer.json(info)
+    }
+
     /// The keyboard page and its socket, served with one certificate. Without a
     /// certificate (dry-run development copy only) both listen on 127.0.0.1 alone.
+    @discardableResult
     private func addApp(_ identity: TLSIdentity?, ports: (app: UInt16, socket: UInt16), route: String,
-                        gate: TailnetGate? = nil) throws {
+                        gate: TailnetGate? = nil) throws -> (page: HTTPServer, socket: SocketServer) {
         var pageAssets = assets.filter { !$0.key.hasPrefix("/setup/") }
         pageAssets["/config.json"] = HTTPServer.json(["socketPort": Int(ports.socket)])
         let loopbackOnly = identity == nil
@@ -349,6 +375,7 @@ public final class TactileService {
         socket.onChange = { [weak self] in self?.connectionsChanged() }
         socket.onConnect = { [weak self] device, isNew in self?.connected(device, isNew: isNew) }
         sockets.append(socket)
+        return (pages[pages.count - 1], socket)
     }
 
     /// Marks a device as typing; the menu shows "input flowing" for a moment.

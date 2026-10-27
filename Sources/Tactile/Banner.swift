@@ -2,32 +2,6 @@ import AppKit
 import CoreImage
 import TactileCore
 
-enum QRCode {
-    /// A QR code with one pixel per module; scale it up without smoothing.
-    static func image(for text: String) -> CIImage? {
-        guard let filter = CIFilter(name: "CIQRCodeGenerator") else { return nil }
-        filter.setValue(Data(text.utf8), forKey: "inputMessage")
-        filter.setValue("M", forKey: "inputCorrectionLevel")
-        return filter.outputImage
-    }
-}
-
-/// Small AppKit helpers shared by the menu bar and the pairing window.
-enum Mac {
-    static func copy(_ text: String) {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
-    }
-
-    static func openAccessibilitySettings() {
-        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
-    }
-
-    static func showLog() {
-        NSWorkspace.shared.open(Paths.logFile)
-    }
-}
-
 /// What Terminal shows when Tactile runs outside the menu bar app.
 enum Banner {
     static func show(_ state: TactileService.Snapshot) {
@@ -37,7 +11,8 @@ enum Banner {
         print("")
         print("  \(bold)Tactile is running\(reset) 🔒\(state.dryRun ? "  \(dim)(dry run — input is only logged)\(reset)" : "")")
         print("")
-        // Scanning pairs too: the code rides after "#", which never leaves the iPad.
+        // With Tailscale, scanning pairs too (over HTTPS; the code rides after
+        // "#", which never leaves the iPad). Otherwise the code is typed.
         qrLines(for: state.pairingLink).forEach { print("  \($0)") }
         print("")
         if let tailscaleURL = state.tailscaleURL {

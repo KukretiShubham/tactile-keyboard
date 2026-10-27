@@ -179,7 +179,7 @@ export function createShortcuts({ bar, left, right, tabs, title, add }, { send, 
       }
       if (changed) render();
     },
-    /** The Mac's keyboard layout changed (see keys.js `applyLabels`). */
+    /** The Mac's keyboard layout changed; letter shortcuts follow it (keys.js `codeForCharacter`). */
     setLabels: (next) => { labels = next; },
     /** Moves the shortcuts beside the trackpad, or back to the top bar. */
     placeBesideTrackpad(on) {

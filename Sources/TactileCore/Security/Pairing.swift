@@ -20,8 +20,6 @@ public final class Pairing {
         }
     }
 
-    /// Name for devices paired before Tactile recorded names.
-    public static let unnamed = "Earlier pairing"
 
     /// A device that hasn't connected for this long has to pair again.
     public static let idleExpiry: TimeInterval = 90 * 24 * 60 * 60
@@ -98,25 +96,19 @@ public final class Pairing {
         return (token, device)
     }
 
-    /// Gives a device a better name. Unnamed devices take any name; devices
-    /// named only by their type ("iPad · Tailscale") take a real device name,
-    /// such as the one Tailscale knows.
+    /// Gives a device a better name: devices named only by their type
+    /// ("iPad · Tailscale") take a real device name, such as the one Tailscale
+    /// knows.
     func improveName(_ id: String, to name: String, isRealName: Bool) {
         guard let current = devices.first(where: { $0.id == id })?.name, current != name else { return }
         let base = current.components(separatedBy: " · ").first ?? current
         let byTypeOnly = DeviceKind.genericNames.contains(base)
-        guard current == Self.unnamed || (isRealName && byTypeOnly) else { return }
+        guard isRealName && byTypeOnly else { return }
         update(id) { $0.name = name }
     }
 
     public func revoke(_ id: String) {
         devices.removeAll { $0.id == id }
-        save()
-        onDevicesChanged?()
-    }
-
-    public func revokeAll() {
-        devices.removeAll()
         save()
         onDevicesChanged?()
     }
@@ -167,13 +159,7 @@ public final class Pairing {
         guard let data = try? Data(contentsOf: store) else { return [] }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        if let devices = try? decoder.decode([Device].self, from: data) { return devices }
-        // Earlier versions stored bare token hashes, with no names. Each gets
-        // its real name when it next connects; ones that never connect again
-        // expire after a week instead of the usual 90 days.
-        let hashes = (try? decoder.decode([String].self, from: data)) ?? []
-        let lastSeen = Date().addingTimeInterval(-(idleExpiry - 7 * 24 * 60 * 60))
-        return hashes.map { Device(id: String($0.prefix(12)), tokenHash: $0, name: unnamed, pairedAt: lastSeen, lastSeen: lastSeen) }
+        return (try? decoder.decode([Device].self, from: data)) ?? []
     }
 
     private func save() {

@@ -1,8 +1,7 @@
 import { ICONS } from './icons.js';
-import { settings } from './settings.js';
 import { glyphOf, isCustomHotkey } from './hotkeys.js';
 import { SHORTCUTS } from './shortcuts.js';
-import { el } from './util.js';
+import { closeSheet, el, openSheet } from './util.js';
 
 export const SKINS = [
   { id: 'auto', name: 'Automatic', note: 'Follows iPad appearance' },
@@ -23,28 +22,15 @@ function miniKeyboard(skin) {
   return el('div', { className: 'mini-deck', attrs: { 'data-skin': skin } }, row(7), row(6), row(4));
 }
 
-/** Shows a sheet (a `.scrim` holding a `.sheet`) with its animation. */
-export function openSheet(sheet) {
-  sheet.hidden = false;
-  requestAnimationFrame(() => sheet.classList.add('shown'));
-}
-
-export function closeSheet(sheet) {
-  sheet.classList.remove('shown');
-  setTimeout(() => { sheet.hidden = true; }, 220);
-}
-
-export function setupSheets({ connection, feedback, typingModel, onNewHotkey, packChoices }) {
-  const open = openSheet;
-  const close = closeSheet;
-
-  document.querySelectorAll('[data-icon]').forEach((el) => { el.innerHTML = ICONS[el.dataset.icon]; });
+/** Settings, and Type on iPad. Returns `sync`, to redraw after outside changes. */
+export function setupSheets({ connection, feedback, settings, typingModel, onNewHotkey, packChoices }) {
+  document.querySelectorAll('[data-icon]').forEach((node) => { node.innerHTML = ICONS[node.dataset.icon]; });
 
   // Settings
   const settingsSheet = document.getElementById('settingsSheet');
   document.getElementById('settingsButton').addEventListener('click', () => {
     renderPackChoices();
-    open(settingsSheet);
+    openSheet(settingsSheet);
   });
 
   // A switch per app tab beside the trackpad, to hide the ones you don't use.
@@ -127,7 +113,7 @@ export function setupSheets({ connection, feedback, typingModel, onNewHotkey, pa
   settings.subscribe((key) => { if (key === 'customHotkeys') renderCustomHotkeys(); });
   renderCustomHotkeys();
   document.getElementById('newHotkeyButton').addEventListener('click', () => {
-    close(settingsSheet);
+    closeSheet(settingsSheet);
     onNewHotkey();
   });
 
@@ -200,7 +186,7 @@ export function setupSheets({ connection, feedback, typingModel, onNewHotkey, pa
   sync();
 
   document.getElementById('forgetButton').addEventListener('click', () => {
-    close(settingsSheet);
+    closeSheet(settingsSheet);
     connection.forget();
   });
 
@@ -208,65 +194,24 @@ export function setupSheets({ connection, feedback, typingModel, onNewHotkey, pa
   const textSheet = document.getElementById('textSheet');
   const textField = document.getElementById('textField');
   document.getElementById('textButton').addEventListener('click', () => {
-    open(textSheet);
+    openSheet(textSheet);
     textField.focus();
   });
   document.getElementById('textSend').addEventListener('click', () => {
     if (textField.value) connection.send({ t: 'txt', s: textField.value });
     textField.value = '';
     textField.blur();
-    close(textSheet);
+    closeSheet(textSheet);
   });
 
   for (const sheet of [settingsSheet, textSheet]) {
     sheet.addEventListener('click', (event) => {
       if (event.target === sheet || event.target.closest('[data-close]')) {
         document.activeElement?.blur();
-        close(sheet);
+        closeSheet(sheet);
       }
     });
   }
 
-  // Pairing
-  const pairSheet = document.getElementById('pairSheet');
-  const pairCode = document.getElementById('pairCode');
-  const pairError = document.getElementById('pairError');
-  const submit = () => {
-    const code = pairCode.value.replace(/\D/g, '');
-    if (code.length !== 6) {
-      pairError.textContent = 'The code has six digits.';
-      return;
-    }
-    pairError.textContent = '';
-    connection.pair(code);
-  };
-  pairCode.addEventListener('input', () => {
-    pairCode.value = pairCode.value.replace(/\D/g, '').slice(0, 6);
-    if (pairCode.value.length === 6) submit();
-  });
-  pairCode.addEventListener('keydown', (event) => { if (event.key === 'Enter') submit(); });
-  document.getElementById('pairButton').addEventListener('click', submit);
-
-  return {
-    sync,
-    showPairing() {
-      if (!pairSheet.hidden) return;
-      pairCode.value = '';
-      pairError.textContent = '';
-      open(pairSheet);
-      pairCode.focus();
-    },
-    hidePairing() {
-      if (pairSheet.hidden) return;
-      pairCode.blur();
-      close(pairSheet);
-    },
-    pairingDenied(reason) {
-      pairCode.value = '';
-      pairError.textContent = {
-        locked: 'Too many tries. Wait a minute, then try again.',
-        expired: 'That QR code has expired. Enter the code your Mac shows now.',
-      }[reason] ?? "That code didn't match. Check the code in Tactile's menu on your Mac.";
-    },
-  };
+  return { sync };
 }

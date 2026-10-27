@@ -2,13 +2,14 @@ import { Connection } from './connection.js';
 import { Feedback } from './feedback.js';
 import { createFloating, HANDLE_SPACE } from './floating.js';
 import { createKeyboard } from './keyboard.js';
-import { settings, storage } from './settings.js';
+import { settings } from './settings.js';
+import { createPairingSheet } from './pairing-sheet.js';
 import { setupSheets } from './sheets.js';
 import { createHotkeyEditor } from './hotkey-editor.js';
 import { createShortcuts, PACK_ICON_APPS } from './shortcuts.js';
 import { createTrackpad } from './trackpad.js';
 import { TypingModel } from './typing-model.js';
-import { clamp, contentBox } from './util.js';
+import { clamp, contentBox, storage } from './util.js';
 import { keepScreenAwake } from './wake-lock.js';
 
 const root = document.documentElement;
@@ -82,8 +83,9 @@ const hotkeyEditor = createHotkeyEditor({
     recordKeys = handler;
   },
 });
+const pairingSheet = createPairingSheet(connection);
 const sheets = setupSheets({
-  connection, feedback, typingModel,
+  connection, feedback, settings, typingModel,
   onNewHotkey: () => hotkeyEditor.open(),
   packChoices: () => shortcuts.offered(),
 });
@@ -94,13 +96,13 @@ connection.addEventListener('icons', ({ detail }) => shortcuts.setIcons(detail.i
 
 // Key labels and shortcuts follow the Mac's keyboard layout.
 let macLabels = {};
-function applyLabels() {
+function showMacLayout() {
   keyboard.setLabels(settings.get('macLabels') ? macLabels : {});
   shortcuts.setLabels(macLabels);
 }
 connection.addEventListener('layout', ({ detail }) => {
   macLabels = detail.keys ?? {};
-  applyLabels();
+  showMacLayout();
 });
 
 // Appearance
@@ -204,7 +206,7 @@ function placeControls(onPalmRests) {
 settings.subscribe((key) => {
   if (key === 'skin' || key === 'glow') applySkin();
   if (['layout', 'keyHeight', 'functionRow', 'keyboardPosition', 'keyboardSize', 'floatingFrame'].includes(key)) fit();
-  if (key === 'macLabels') applyLabels();
+  if (key === 'macLabels') showMacLayout();
 });
 prefersDark.addEventListener('change', applySkin);
 new ResizeObserver(fit).observe(stage);
@@ -227,11 +229,11 @@ connection.addEventListener('state', ({ detail: state }) => {
       pairingLinkUsed = true;
       connection.pair(pairingLink);
     } else {
-      sheets.showPairing();
+      pairingSheet.show();
     }
   }
   if (state === 'ready') {
-    sheets.hidePairing();
+    pairingSheet.hide();
     send({ t: 'icons', ks: PACK_ICON_APPS });
   }
   if (state !== 'ready') {
@@ -242,8 +244,8 @@ connection.addEventListener('state', ({ detail: state }) => {
 connection.addEventListener('denied', ({ detail }) => {
   // A scanned code that no longer works (Tactile restarted, or another iPad
   // used it) falls back to typing the current code.
-  sheets.showPairing();
-  sheets.pairingDenied(pairingLinkUsed && detail === 'code' ? 'expired' : detail);
+  pairingSheet.show();
+  pairingSheet.denied(pairingLinkUsed && detail === 'code' ? 'expired' : detail);
 });
 
 keepScreenAwake(settings);

@@ -3,11 +3,31 @@
 // nothing to the Mac meanwhile) or type text to send. Hotkeys are kept in
 // Settings and shown with an app's pack, or with the general shortcuts.
 import { comboGlyph, isModifier } from './keys.js';
-import { closeSheet, openSheet } from './sheets.js';
-import { el } from './util.js';
+import { closeSheet, el, openSheet } from './util.js';
 
 const ORDER = ['Control', 'Alt', 'Shift', 'Meta'];
 const byAppleOrder = (a, b) => ORDER.findIndex((m) => a.startsWith(m)) - ORDER.findIndex((m) => b.startsWith(m));
+
+/**
+ * Turns the keyboard's messages into a key combination: the modifiers held
+ * when a key goes down, plus that key. `capture(message)` returns the
+ * combination when one is complete (else null); nothing is sent anywhere.
+ */
+export function comboRecorder() {
+  const held = new Set();
+  return {
+    capture(message) {
+      if (message.t !== 'kd' && message.t !== 'ku') return null;
+      if (isModifier(message.k)) {
+        if (message.t === 'kd') held.add(message.k);
+        else held.delete(message.k);
+        return null;
+      }
+      return message.t === 'kd' && !message.r ? [...held].sort(byAppleOrder).concat(message.k) : null;
+    },
+    reset: () => held.clear(),
+  };
+}
 
 /**
  * `record(handler)` routes the keyboard's messages to `handler` instead of
@@ -26,19 +46,14 @@ export function createHotkeyEditor({ settings, feedback, deck, record, packs }) 
   const add = document.getElementById('hotkeyAdd');
 
   let state = null; // { kind, keys, pack }
-  const held = new Set();
+  const recorder = comboRecorder();
 
-  // Modifiers held when a key goes down make up the combination.
   function capture(message) {
-    if (message.t !== 'kd' && message.t !== 'ku') return;
-    if (isModifier(message.k)) {
-      if (message.t === 'kd') held.add(message.k);
-      else held.delete(message.k);
-    } else if (message.t === 'kd' && !message.r) {
-      state.keys = [...held].sort(byAppleOrder).concat(message.k);
-      feedback.click();
-      update();
-    }
+    const keys = recorder.capture(message);
+    if (!keys) return;
+    state.keys = keys;
+    feedback.click();
+    update();
   }
 
   function update() {
@@ -72,7 +87,7 @@ export function createHotkeyEditor({ settings, feedback, deck, record, packs }) 
 
   function close() {
     record(null);
-    held.clear();
+    recorder.reset();
     document.activeElement?.blur();
     closeSheet(sheet);
     state = null;

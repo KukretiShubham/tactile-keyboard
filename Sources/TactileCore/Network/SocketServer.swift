@@ -43,13 +43,13 @@ public final class SocketServer {
     /// Shown next to device names, e.g. "iPad · Tailscale".
     let route: String
     /// While true, input is ignored (the connection stays up).
-    var isPaused: () -> Bool = { false }
+    public var isPaused: () -> Bool = { false }
     /// A device finished connecting; `isNew` when it just paired.
     public var onConnect: ((Pairing.Device, _ isNew: Bool) -> Void)?
     /// Connected devices changed.
     var onChange: (() -> Void)?
     /// A device disconnected from the menu; it's refused until reconnected.
-    var isHeld: (String) -> Bool = { _ in false }
+    public var isHeld: (String) -> Bool = { _ in false }
     /// A device asked for the app with this bundle ID to come to the front
     /// (opening it if needed), from its app hotkey tabs; if given, its window
     /// whose title includes the second string (e.g. "codex") comes first.
@@ -90,9 +90,10 @@ public final class SocketServer {
         options.autoReplyPing = true
         options.maximumMessageSize = 16 * 1024
         options.setClientRequestHandler(queue) { _, headers in
-            // Only the page this Mac serves may open the socket.
+            // Only the page this Mac serves may open the socket. Browsers always
+            // say which page is asking; anything that doesn't is refused.
             let origin = headers.first { $0.name.caseInsensitiveCompare("Origin") == .orderedSame }?.value
-            let allowed = origin.map { Self.isAllowedOrigin($0, scheme: scheme, port: appPort) } ?? true
+            let allowed = origin.map { Self.isAllowedOrigin($0, scheme: scheme, port: appPort) } ?? false
             return NWProtocolWebSocket.Response(status: allowed ? .accept : .reject, subprotocol: nil, additionalHeaders: nil)
         }
 
@@ -199,8 +200,7 @@ public final class SocketServer {
                 receive(client)
             case .refused(let reason):
                 Log.warn("Refused a Tailscale connection from \(client.address): \(reason).")
-                reply(client, ["t": "denied", "reason": "foreign"])
-                queue.asyncAfter(deadline: .now() + 0.5) { client.connection.cancel() }
+                refuse(client, reason: "foreign")
             }
         }
     }
@@ -233,6 +233,12 @@ public final class SocketServer {
             }
             if self.clients[ObjectIdentifier(client)] != nil { self.receive(client) }
         }
+    }
+
+    /// Says why, then disconnects a moment later so the reason arrives first.
+    private func refuse(_ client: Client, reason: String) {
+        reply(client, ["t": "denied", "reason": reason])
+        queue.asyncAfter(deadline: .now() + 0.5) { client.connection.cancel() }
     }
 
     private func reply(_ client: Client, _ payload: [String: Any]) {
@@ -301,8 +307,7 @@ public final class SocketServer {
         case "hello":
             if let token = message.token, let device = pairing.device(forToken: token) {
                 if isHeld(device.id) {
-                    reply(client, ["t": "denied", "reason": "held"])
-                    client.connection.cancel()
+                    refuse(client, reason: "held")
                     return
                 }
                 pairing.improveName(device.id, to: "\(client.peer?.deviceName ?? DeviceKind.name(claimed: message.name)) · \(route)",

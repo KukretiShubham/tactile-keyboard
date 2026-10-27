@@ -91,6 +91,50 @@ enum NetworkChecks {
             }
         }
 
+        checks.run("socket: oversized and unknown input is ignored") {
+            try withTemporaryDirectory { folder in
+                let device = try pairedDevice(folder)
+                defer { queue.sync { device.server.stop() } }
+                device.socket.send(["t": "txt", "s": String(repeating: "a", count: 4001)])
+                device.socket.send(["t": "combo", "ks": ["MetaLeft", "ShiftLeft", "AltLeft", "ControlLeft", "KeyA", "KeyB"]])
+                device.socket.send(["t": "combo", "ks": [String]()])
+                device.socket.send(["t": "icons", "ks": Array(repeating: "com.example.App", count: 65)])
+                device.socket.send(["t": "mv", "x": 1e9, "y": -1e9])
+                device.socket.send(["t": "ping"])
+                try expectEqual(device.socket.receive()?["t"] as? String, "pong", "still connected")
+                try expectEqual(device.input.typed, ["move 800.0 -800.0"], "only the clamped move went through")
+            }
+        }
+
+        checks.run("socket: input is ignored while paused, and held devices are refused") {
+            try withTemporaryDirectory { folder in
+                let paused = NSLock()
+                var isPaused = true
+                var heldIDs: Set<String> = []
+                let device = try pairedDevice(folder) { server in
+                    server.isPaused = { paused.withLock { isPaused } }
+                    server.isHeld = { id in paused.withLock { heldIDs.contains(id) } }
+                }
+                defer { queue.sync { device.server.stop() } }
+                device.socket.send(["t": "kd", "k": "KeyA"])
+                device.socket.send(["t": "ping"])
+                try expectEqual(device.socket.receive()?["t"] as? String, "pong", "pings still answered")
+                try expectEqual(device.input.typed, [], "input while paused")
+                paused.withLock { isPaused = false }
+                device.socket.send(["t": "kd", "k": "KeyA"])
+                device.socket.send(["t": "ping"])
+                _ = device.socket.receive()
+                try expectEqual(device.input.typed, ["down KeyA"], "input after resuming")
+
+                // A device disconnected from the menu is turned away when it comes back.
+                let id = try require(queue.sync { device.pairing.devices.first?.id }, "device")
+                _ = paused.withLock { heldIDs.insert(id) }
+                let again = try Socket(port: device.port)
+                again.send(["t": "hello", "token": device.token])
+                try expectEqual(again.receive()?["reason"] as? String, "held", "reply to a held device")
+            }
+        }
+
         checks.run("socket: pages from other sites can't connect") {
             try withTemporaryDirectory { folder in
                 let pairing = Pairing(store: folder.appendingPathComponent("devices.json"))
@@ -101,8 +145,27 @@ enum NetworkChecks {
                 let socket = try Socket(port: port, origin: "http://attacker.example:8443")
                 socket.send(["t": "hello"])
                 try expect(socket.receive() == nil, "a foreign origin got a reply")
+                let anonymous = try Socket(port: port, origin: nil)
+                anonymous.send(["t": "hello"])
+                try expect(anonymous.receive() == nil, "a client naming no page got a reply")
             }
         }
+    }
+
+    // Pairs a device and returns its socket, the server and what it typed.
+    private static func pairedDevice(_ folder: URL, configure: (SocketServer) -> Void = { _ in }) throws
+        -> (socket: Socket, server: SocketServer, input: RecordingInput, pairing: Pairing, port: UInt16, token: String) {
+        let pairing = Pairing(store: folder.appendingPathComponent("devices.json"))
+        let input = RecordingInput()
+        let server = try SocketServer(port: 0, appPort: 1, tls: nil, loopbackOnly: true, route: "Test",
+                                      pairing: pairing, queue: queue, makeInput: { input })
+        configure(server)
+        let port = try require(waitFor { server.start(ready: $0) }, "port")
+        let socket = try Socket(port: port)
+        socket.send(["t": "pair", "code": queue.sync { pairing.code }, "name": "iPad"])
+        let ready = try require(socket.receive(), "reply to pairing")
+        try expectEqual(ready["t"] as? String, "ready", "paired")
+        return (socket, server, input, pairing, port, try require(ready["token"] as? String, "token"))
     }
 
     private struct Response {
@@ -135,7 +198,8 @@ enum NetworkChecks {
 private final class Socket {
     private let task: URLSessionWebSocketTask
 
-    init(port: UInt16, origin: String? = nil) throws {
+    /// `origin` is the page asking, as a browser would say; nil sends none.
+    init(port: UInt16, origin: String? = "http://127.0.0.1:1") throws {
         var request = URLRequest(url: try require(URL(string: "ws://127.0.0.1:\(port)"), "socket URL"))
         if let origin { request.setValue(origin, forHTTPHeaderField: "Origin") }
         task = URLSession.shared.webSocketTask(with: request)

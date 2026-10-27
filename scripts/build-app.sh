@@ -33,9 +33,9 @@ iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns"
 rm -rf "$(dirname "$ICONSET")"
 
 # macOS ties Accessibility to the app's signature. With a stable certificate
-# (create a "Code Signing" certificate named "Tactile Local Signing" once in
-# Keychain Access), the permission survives rebuilds. Without one the app is
-# signed ad-hoc, and every rebuild needs Accessibility switched on again.
+# (scripts/create-signing-certificate.sh makes one named "Tactile Local
+# Signing"), the permission survives rebuilds. Without one the app is signed
+# ad hoc, and every rebuild needs Accessibility switched on again.
 IDENTITY="Tactile Local Signing"
 if security find-certificate -c "$IDENTITY" >/dev/null 2>&1; then
     codesign --force --sign "$IDENTITY" --options runtime --identifier app.tactile.mac "$APP"

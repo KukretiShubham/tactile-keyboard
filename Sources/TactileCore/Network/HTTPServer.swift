@@ -16,7 +16,7 @@ public final class HTTPServer {
 
     private let listener: NWListener
     private let queue: DispatchQueue
-    private let assets: [String: Asset]
+    private var assets: [String: Asset]
     private let policy: String
 
     private static let types = [
@@ -70,6 +70,12 @@ public final class HTTPServer {
 
     public func stop() {
         listener.cancel()
+    }
+
+    /// Replaces one file, e.g. when the Mac's Tailscale address becomes known.
+    /// Call on the server's queue.
+    func setAsset(_ asset: Asset, at path: String) {
+        assets[path] = asset
     }
 
     private func accept(_ connection: NWConnection) {

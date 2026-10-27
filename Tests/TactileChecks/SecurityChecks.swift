@@ -123,6 +123,29 @@ enum SecurityChecks {
             try expectEqual(lookups.withLock { count }, 1, "lookups")
         }
 
+        checks.run("certificates: the local CA only vouches for private names and addresses") {
+            for address in ["10.1.2.3", "172.16.0.9", "192.168.1.20", "100.100.1.1", "127.0.0.1"] {
+                try expect(LocalAuthority.isPermitted(address), "\(address) is private")
+            }
+            for address in ["8.8.8.8", "1.1.1.1", "172.32.0.1", "100.128.0.1", "192.169.0.1", "not an address"] {
+                try expect(!LocalAuthority.isPermitted(address), "\(address) is refused")
+            }
+            try withTemporaryDirectory { folder in
+                let authority = try LocalAuthority.prepare(hostName: "test-mac.local", addresses: ["192.168.1.20", "8.8.8.8"],
+                                                           directory: folder.appendingPathComponent("tls"))
+                let ca = try describe(authority.caDER, in: folder)
+                try expect(ca.contains("X509v3 Name Constraints: critical"), "the CA's name constraints are critical")
+                for allowed in ["DNS:local", "IP:10.0.0.0/255.0.0.0", "IP:192.168.0.0/255.255.0.0", "IP:100.64.0.0/255.192.0.0"] {
+                    try expect(ca.contains(allowed), "the CA permits \(allowed)")
+                }
+                let server = try describe(authority.certificateDER, in: folder)
+                try expect(server.contains("DNS:test-mac.local") && server.contains("IP Address:192.168.1.20"), "the certificate names this Mac")
+                try expect(!server.contains("8.8.8.8"), "the certificate leaves out a public address")
+                let mode = try FileManager.default.attributesOfItem(atPath: folder.appendingPathComponent("tls/ca.key").path)[.posixPermissions] as? Int
+                try expectEqual(mode, 0o600, "CA key permissions")
+            }
+        }
+
         checks.run("Tailscale: machine names read naturally") {
             try expectEqual(Tailscale.friendlyName("ipad-air-13"), "iPad Air 13", "ipad-air-13")
             try expectEqual(Tailscale.friendlyName("macbook-pro"), "MacBook Pro", "macbook-pro")
@@ -134,5 +157,20 @@ enum SecurityChecks {
     /// A six-digit code that isn't `code`.
     private static func wrong(_ code: String) -> String {
         code == "000000" ? "111111" : "000000"
+    }
+
+    /// A certificate as `openssl x509 -text` describes it.
+    private static func describe(_ der: Data, in folder: URL) throws -> String {
+        let file = folder.appendingPathComponent("\(UUID().uuidString).der")
+        try der.write(to: file)
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/openssl")
+        process.arguments = ["x509", "-inform", "der", "-in", file.path, "-noout", "-text"]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        try process.run()
+        let output = pipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        return String(decoding: output, as: UTF8.self)
     }
 }

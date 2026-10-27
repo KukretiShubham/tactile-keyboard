@@ -9,9 +9,14 @@ public enum Log {
         return formatter
     }()
 
-    public static func info(_ message: String) { print("\(clock.string(from: Date()))  \(message)") }
-    public static func warn(_ message: String) { print("\u{1B}[33m⚠︎ \(message)\u{1B}[0m") }
-    public static func input(_ message: String) { print("\u{1B}[2m\(clock.string(from: Date()))  \(message)\u{1B}[0m") }
+    // Colors only when a person is watching in Terminal, never in the log file.
+    private static let colored = isatty(STDOUT_FILENO) != 0
+    private static func styled(_ text: String, _ code: String) -> String { colored ? "\u{1B}[\(code)m\(text)\u{1B}[0m" : text }
+    private static var now: String { clock.string(from: Date()) }
+
+    public static func info(_ message: String) { print("\(now)  \(message)") }
+    public static func warn(_ message: String) { print(styled("\(now)  ⚠︎ \(message)", "33")) }
+    public static func input(_ message: String) { print(styled("\(now)  \(message)", "2")) }
 }
 
 /// How unrecoverable errors reach the user: printed in Terminal by default, or

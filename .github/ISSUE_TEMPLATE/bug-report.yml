@@ -1,0 +1,46 @@
+name: Bug report
+description: Something doesn't work as it should.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: input
+    id: tactile
+    attributes:
+      label: Tactile version
+      description: Hold ⌥ while opening Tactile's menu, or check the release you downloaded.
+      placeholder: 1.1.0
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: macOS 15.6
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: iPad (or other device) and browser
+      placeholder: iPad, iPadOS 18, Safari, added to Home Screen
+    validations:
+      required: true
+  - type: dropdown
+    id: route
+    attributes:
+      label: Connected over
+      options: [Tailscale, Wi-Fi only, Not connected yet]
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: From Show Log in Tactile's menu (hold ⌥), or ~/Library/Logs/Tactile.log. Remove anything you'd rather not share, such as device names or addresses.
+      render: text

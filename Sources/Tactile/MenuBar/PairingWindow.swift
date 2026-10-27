@@ -50,7 +50,9 @@ final class PairingWindowController {
                 VStack(spacing: 6) {
                     Text("Pair a Device")
                         .font(.title2.weight(.semibold))
-                    Text("Scan with the iPad's Camera. Tactile opens and pairs on its own.")
+                    Text(state.pairsOnScan
+                         ? "Scan with the iPad's Camera. Tactile opens and pairs on its own."
+                         : "Scan with the iPad's Camera, then enter the code below.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -64,7 +66,7 @@ final class PairingWindowController {
                     .accessibilityLabel("Pairing QR code")
 
                 VStack(spacing: 2) {
-                    Text("Or enter this code")
+                    Text(state.pairsOnScan ? "Or enter this code" : "Pairing code")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Text("\(state.code.prefix(3)) \(state.code.suffix(3))")

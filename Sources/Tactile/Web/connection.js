@@ -1,4 +1,4 @@
-import { storage } from './settings.js';
+import { storage } from './util.js';
 
 const TOKEN_KEY = 'tactile.token';
 

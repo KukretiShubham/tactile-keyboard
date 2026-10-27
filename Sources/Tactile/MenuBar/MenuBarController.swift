@@ -229,8 +229,6 @@ final class MenuBarController: NSObject {
             if defaults.bool(forKey: "notifyOnConnect") {
                 notifier?.post(title: "\(device.name) connected", body: "It can now type and move the pointer on this Mac.")
             }
-        case .started, .newCode:
-            break
         }
     }
 }

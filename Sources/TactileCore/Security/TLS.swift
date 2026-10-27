@@ -64,11 +64,13 @@ public struct TLSIdentity {
 /// The CA is name-constrained to `.local` names and private IPv4 ranges, so even
 /// if its key leaked it could not be used to impersonate public websites on the
 /// iPad that trusts it.
-struct LocalAuthority {
+public struct LocalAuthority {
     let identity: TLSIdentity
-    let caDER: Data
+    public let caDER: Data
+    /// The HTTPS certificate issued this time (DER), for checks.
+    public let certificateDER: Data
     let caName: String
-    let fingerprint: String
+    public let fingerprint: String
 
     /// Private ranges the CA may issue for (RFC 1918, Tailscale/CGNAT, loopback).
     static let permittedRanges: [(base: UInt32, mask: UInt32)] = [
@@ -80,7 +82,7 @@ struct LocalAuthority {
     ]
 
     /// - Parameter directory: Where the CA lives. Tests pass a temporary folder.
-    static func prepare(hostName: String?, addresses: [String], directory: URL = Paths.tls) throws -> LocalAuthority {
+    public static func prepare(hostName: String?, addresses: [String], directory: URL = Paths.tls) throws -> LocalAuthority {
         try Paths.makePrivateDirectory(directory)
         let caKey = directory.appendingPathComponent("ca.key")
         let caCert = directory.appendingPathComponent("ca.crt")
@@ -118,7 +120,8 @@ struct LocalAuthority {
 
         let caDER = try OpenSSL.derFromPEM(Data(contentsOf: caCert))
         return LocalAuthority(identity: try TLSIdentity.load(certificate: cert, key: key, extraChain: caCert),
-                              caDER: caDER, caName: authorityName,
+                              caDER: caDER, certificateDER: try OpenSSL.derFromPEM(Data(contentsOf: cert)),
+                              caName: authorityName,
                               // Same format iOS uses under the profile's More Details.
                               fingerprint: caDER.sha256.fingerprint())
     }
@@ -155,7 +158,8 @@ struct LocalAuthority {
         Log.info("Created a new certificate authority for this Mac.")
     }
 
-    static func isPermitted(_ address: String) -> Bool {
+    /// Whether the CA may vouch for `address` (an IPv4 address in a private range).
+    public static func isPermitted(_ address: String) -> Bool {
         let parts = address.split(separator: ".").compactMap { UInt32($0) }
         guard parts.count == 4, parts.allSatisfy({ $0 < 256 }) else { return false }
         let value = parts.reduce(0) { $0 << 8 | $1 }

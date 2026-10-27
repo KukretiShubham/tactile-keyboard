@@ -1,6 +1,7 @@
 // Preferences live only on this iPad. Storage can be unavailable (private
 // browsing), so every access is guarded and defaults always apply.
 import { DEFAULT_SHORTCUTS } from './shortcuts.js';
+import { storage } from './util.js';
 
 const KEY = 'tactile.settings.v1';
 
@@ -39,27 +40,10 @@ const DEFAULTS = {
   keepAwake: true,
 };
 
-export const storage = {
-  get(key) {
-    try { return localStorage.getItem(key); } catch { return null; }
-  },
-  set(key, value) {
-    try { localStorage.setItem(key, value); } catch { /* not persisted */ }
-  },
-  remove(key) {
-    try { localStorage.removeItem(key); } catch { /* nothing stored */ }
-  },
-};
-
-// The general shortcuts before app hotkeys arrived. Anyone who kept them gets
-// the new, shorter default, which leaves room for app hotkeys beside it.
-const EARLIER_DEFAULT = 'undo,redo,copy,paste,switchApp,screenshot,missionControl,spotlight';
 
 function load() {
   try {
-    const saved = JSON.parse(storage.get(KEY) || '{}');
-    if (Array.isArray(saved.shortcuts) && saved.shortcuts.join(',') === EARLIER_DEFAULT) saved.shortcuts = DEFAULT_SHORTCUTS;
-    return { ...DEFAULTS, ...saved };
+    return { ...DEFAULTS, ...JSON.parse(storage.get(KEY) || '{}') };
   } catch {
     return { ...DEFAULTS };
   }

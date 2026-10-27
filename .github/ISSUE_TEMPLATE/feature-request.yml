@@ -1,0 +1,11 @@
+name: Idea or request
+description: Suggest a feature, a hotkey pack for another app, or an improvement.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like?
+      description: What you're trying to do, and how Tactile could help. For a new app's hotkeys, link its documented shortcuts.
+    validations:
+      required: true

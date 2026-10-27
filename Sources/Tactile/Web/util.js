@@ -33,3 +33,30 @@ export function contentBox(element) {
     paddingTop: padding('Top'),
   };
 }
+
+/**
+ * This device's storage. It can be unavailable (private browsing), so every
+ * access is guarded; callers fall back to defaults.
+ */
+export const storage = {
+  get(key) {
+    try { return localStorage.getItem(key); } catch { return null; }
+  },
+  set(key, value) {
+    try { localStorage.setItem(key, value); } catch { /* not persisted */ }
+  },
+  remove(key) {
+    try { localStorage.removeItem(key); } catch { /* nothing stored */ }
+  },
+};
+
+/** Shows a sheet (a `.scrim` holding a `.sheet`) with its animation. */
+export function openSheet(sheet) {
+  sheet.hidden = false;
+  requestAnimationFrame(() => sheet.classList.add('shown'));
+}
+
+export function closeSheet(sheet) {
+  sheet.classList.remove('shown');
+  setTimeout(() => { sheet.hidden = true; }, 220);
+}

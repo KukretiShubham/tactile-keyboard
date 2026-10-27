@@ -10,7 +10,7 @@
   <a href="https://github.com/KukretiShubham/tactile-keyboard/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/KukretiShubham/tactile-keyboard"></a>
   <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue">
   <img alt="macOS 15 or later" src="https://img.shields.io/badge/macOS-15%2B-black">
-  <img alt="Swift 6" src="https://img.shields.io/badge/Swift-6-orange">
+  <img alt="Swift 6 toolchain" src="https://img.shields.io/badge/Swift-6%20toolchain-orange">
   <img alt="No dependencies" src="https://img.shields.io/badge/dependencies-none-brightgreen">
 </p>
 
@@ -58,7 +58,7 @@ You need a Mac with **macOS 15 or later**, plus an iPad (any device with a moder
 1. **Download** `Tactile-<version>.zip` from the [latest release](https://github.com/KukretiShubham/tactile-keyboard/releases/latest), unzip it, and move **Tactile.app** to Applications. It runs on Apple silicon and Intel Macs.
 2. **Open it the first time:** Tactile is free and open source, so it isn't notarized by Apple, and macOS blocks it at first. Open it once, then go to System Settings → Privacy & Security, scroll down, and click **Open Anyway** next to Tactile.
 3. **Allow Accessibility:** macOS asks you to allow Tactile in System Settings → Privacy & Security → Accessibility. Every app that types or moves the pointer needs this.
-4. **Pair your iPad:** click the Tactile icon in the menu bar, choose **Pair a Device…**, and scan the QR code with the iPad's camera.
+4. **Pair your iPad:** click the Tactile icon in the menu bar, choose **Pair a Device…**, and scan the QR code with the iPad's camera. With Tailscale, the scan pairs too; on Wi-Fi only, type the six-digit code it shows (see below).
 
 Then tap Share → **Add to Home Screen** on the iPad for a full-screen app without Safari's toolbar.
 
@@ -70,20 +70,20 @@ When you install a newer version, switch Tactile off and on again under Accessib
 Each release lists a SHA-256 checksum next to the zip; compare it with:
 
 ```sh
-shasum -a 256 Tactile-v1.0.0.zip
+shasum -a 256 Tactile-v<version>.zip
 ```
 
 Releases are built by GitHub Actions from the tagged code, with a signed build provenance attestation. With the [GitHub CLI](https://cli.github.com):
 
 ```sh
-gh attestation verify Tactile-v1.0.0.zip --repo KukretiShubham/tactile-keyboard
+gh attestation verify Tactile-v<version>.zip --repo KukretiShubham/tactile-keyboard
 ```
 
 </details>
 
 ### Build it yourself
 
-1. **Install Apple's developer tools**, if you don't have Xcode:
+1. **Install Apple's developer tools**, if you don't have Xcode. You need Xcode 16 or the Command Line Tools 16 or later (they include the Swift 6 toolchain):
    ```sh
    xcode-select --install
    ```
@@ -100,7 +100,7 @@ gh attestation verify Tactile-v1.0.0.zip --repo KukretiShubham/tactile-keyboard
 With [Tailscale](https://tailscale.com) on both devices, Tactile gets a real HTTPS certificate for your Mac, so there's nothing to install on the iPad, and it works away from home too.
 
 1. In the Tailscale admin console, turn on **MagicDNS** and **HTTPS Certificates** (a one-time step).
-2. Open Tactile. The QR code points at your Mac's Tailscale address, such as `https://your-mac.your-tailnet.ts.net:8423`.
+2. Open Tactile and choose **Pair a Device…**. The QR code opens your Mac's Tailscale address, such as `https://your-mac.your-tailnet.ts.net:8423`, and pairs in one scan.
 
 Public certificates are listed in public Certificate Transparency logs, so your Mac's Tailscale name becomes publicly visible.
 
@@ -110,7 +110,9 @@ Without Tailscale, Tactile uses its own certificate, which each iPad trusts once
 
 1. Scan the QR code to open the setup page in Safari.
 2. Follow the steps there: download the certificate, install the profile in Settings (check that its SHA-256 fingerprint matches the one in Tactile's menu; hold ⌥ while opening it), and turn on full trust under General → About → Certificate Trust Settings.
-3. Open Tactile and enter the pairing code. The iPad is remembered from then on.
+3. Open Tactile and type the six-digit pairing code from the Mac. The iPad is remembered from then on.
+
+On Wi-Fi only, the QR code never carries the pairing code: the setup page is plain HTTP, so you type the code on the encrypted page instead.
 
 ### Keep Accessibility allowed when you rebuild it yourself
 
@@ -157,25 +159,7 @@ Tap the settings button (top right):
 
 ### App hotkeys
 
-In landscape with the trackpad showing, the right side of the trackpad has a row of app tabs and that app's hotkeys:
-
-| App | Hotkeys |
-|---|---|
-| Claude Code | Start (`claude`), Stop (esc), Rewind (esc esc), Switch Mode (⇧⇥), Search History (⌃R), Background (⌃B), `/clear`, `/compact` |
-| Codex | Start (`codex`), Edit Previous (esc esc), Search History (⌃R), Copy Output (⌃O), `/model`, `/new`, `/diff`, `/review` |
-| VS Code | Quick Open (⌘P), Commands (⇧⌘P), Terminal (⌃\`), Comment (⌘/), Sidebar (⌘B), Search (⇧⌘F) |
-| Zed | File Finder (⌘P), Commands (⇧⌘P), Terminal (⌃\`), Agent Panel (⌘?), Comment (⌘/), Search (⇧⌘F) |
-| Xcode | Build (⌘B), Run (⌘R), Stop (⌘.), Test (⌘U), Open Quickly (⇧⌘O), Clean (⇧⌘K) |
-| JetBrains IDEs | Search Everywhere (⇧⇧), Run (⌃R), Recent Files (⌘E), Context Actions (⌥↩), Reformat (⌥⌘L), Rename (⇧F6) |
-| Browsers | New Tab, Reopen Tab, Address Bar, Reload, Close Tab, Developer Tools |
-
-- A tab appears when its app is installed on your Mac, with the app's own icon (Tactile doesn't ship any app's logo). Claude Code and Codex can run in a terminal, so their tabs are always there.
-- The hotkeys follow the app in front on your Mac; a green dot shows they're following. The Claude and Codex desktop apps pick their packs too. In a terminal, the agent you picked last stays.
-- Tapping a tab brings that app to the front on your Mac (opening it if needed), so its hotkeys land in the right place. Claude Code and Codex come back wherever you used them last: their desktop app, or the terminal window running them (found by its title, which shows the running program).
-- **Start** opens a new window in your terminal and runs `claude` or `codex` there, so it never types into an agent that's already running.
-- Text hotkeys like `/clear` type the command and press Return.
-- Keys that open something close it with a second tap, and light up meanwhile: panels like VS Code's or Zed's terminal and Zed's Agent panel, browser developer tools, and palettes like Quick Open (which close with Esc, or by themselves once you type). Tactile can't see inside the app, so if you close a panel another way, the next tap opens it again.
-- Tap **+** to make your own: name it, then record keys on Tactile's keyboard (nothing reaches the Mac while recording) or type text, and choose which app it belongs to, or All Apps.
+In landscape with the trackpad showing, the right side of the trackpad has a row of app tabs, each with that app's hotkeys: Claude Code, Codex, VS Code, Zed, Xcode, JetBrains IDEs and browsers. They follow the app in front on your Mac, tapping a tab brings that app forward, and a second tap closes what a hotkey opened. Tap **+** to record your own. The full list and how each one behaves is in [docs/app-hotkeys.md](docs/app-hotkeys.md).
 
 ### The menu bar
 
@@ -193,12 +177,21 @@ Hold ⌥ while opening it for details: addresses, ports, certificate fingerprint
 Tactile can type on your Mac, so it's built to be careful:
 
 - **Encrypted:** everything travels over TLS. The keyboard page and its connection refuse plain HTTP, and only the Mac's own page may connect.
-- **Paired, not open:** a new device needs a six-digit code that works once. Wrong guesses lock out quickly. Remembered devices hold a random 256-bit token that the Mac stores only as a hash, and expire after 90 days unused.
+- **Paired, not open:** a new device needs a six-digit code that works once, and only ever travels over HTTPS. Wrong guesses lock out quickly. Remembered devices hold a random 256-bit token that the Mac stores only as a hash, and expire after 90 days unused.
 - **Only your devices on Tailscale:** Tactile asks Tailscale who owns each device and refuses anything not signed in as you, before it can even try to pair.
 - **A limited certificate:** the local certificate authority can only vouch for `.local` names and private addresses, so it can't be used to impersonate websites.
 - **Nothing leaves your network:** no accounts, no analytics, no cloud service. What Adapt to My Typing learns stays on the iPad. Your paired iPad is told the name of the app in front on the Mac, for app hotkeys.
 
 Found a security problem? Please report it privately, as described in [SECURITY.md](SECURITY.md).
+
+## Troubleshooting
+
+- **"Mac not reachable":** check that both devices are on the same network (guest and some office networks keep devices apart; Tailscale avoids this), that you allowed Tactile when macOS asked about incoming connections, and that nothing else uses ports 8420–8424 (or start Tactile with `--port`).
+- **Keys or the pointer do nothing:** check that Tactile is switched on under System Settings → Privacy & Security → Accessibility. After installing a new version, switch it off and on again.
+- **No key sounds:** Safari only plays sound after a tap; tap **Tap to enable key sounds** at the top. Check the volume, and **Sound in Silent Mode** if the iPad is muted.
+- **The Tailscale address is missing:** turn on MagicDNS and HTTPS Certificates in the Tailscale admin console, and make sure Tailscale is running on the Mac. Tactile adds the address as soon as Tailscale issues the certificate.
+- **"Not allowed" over Tailscale:** with **Only My Devices on Tailscale** on, the iPad must be signed in to Tailscale as the Mac's owner.
+- **Anything else:** hold ⌥ while opening Tactile's menu and choose **Show Log** (it's `~/Library/Logs/Tactile.log`), then [open an issue](https://github.com/KukretiShubham/tactile-keyboard/issues/new/choose) with what you see.
 
 ## FAQ
 
@@ -227,6 +220,8 @@ swift run Tactile --dry-run      # log input instead of controlling the Mac
 swift run Tactile --help         # other options: --port, --no-tailscale, --forget-devices
 ```
 
+Tactile builds with the Swift 6 toolchain (Xcode 16 or Command Line Tools 16+); the code still uses the Swift 5 language mode.
+
 | Folder | What's there |
 |---|---|
 | `Sources/TactileCore/` | Everything but the menu bar UI: pairing and certificates (`Security/`), the web and WebSocket servers (`Network/`), turning messages into keystrokes and pointer events (`Input/`), and shared helpers (`Support/`). |
@@ -238,11 +233,9 @@ swift run Tactile --help         # other options: --port, --no-tailscale, --forg
 iPad Safari ── HTTPS + secure WebSocket ──▶ Tactile (menu bar app) ──▶ macOS keyboard and pointer events
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) to get involved.
-
 ## Contributing
 
-Bug reports, ideas and pull requests are welcome. If Tactile is useful to you, a ⭐ helps others find it.
+Bug reports, ideas and pull requests are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md), and the [changelog](CHANGELOG.md) for what's new. Everyone taking part is expected to follow the [code of conduct](CODE_OF_CONDUCT.md). If Tactile is useful to you, a ⭐ helps others find it.
 
 ## License
 

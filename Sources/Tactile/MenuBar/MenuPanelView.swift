@@ -279,7 +279,6 @@ private struct DeviceCard: View {
         case "iPhone": return "iphone"
         case "Mac": return "laptopcomputer"
         case "Browser": return "globe"
-        case Pairing.unnamed: return "questionmark"
         default: return "ipad.landscape"
         }
     }

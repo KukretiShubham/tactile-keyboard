@@ -15,12 +15,14 @@ if arguments.contains("--help") || arguments.contains("-h") {
     print("""
     Tactile — use an iPad as a keyboard and trackpad for this Mac.
 
-    Usage: tactile [--port 8420] [--dry-run] [--no-tailscale] [--forget-devices]
+    Usage: Tactile [--port 8420] [--dry-run] [--no-tailscale] [--forget-devices]
 
       --port N           Setup page port. The app uses N + 1 and N + 2 with this
                          Mac's local certificate, and N + 3 and N + 4 with its
                          Tailscale certificate. Default 8420.
-      --dry-run          Log input instead of controlling the Mac.
+      --dry-run          Log input instead of controlling the Mac, and serve a
+                         plain-HTTP copy of the page on N + 5 (socket N + 6),
+                         reachable only from this Mac.
       --no-tailscale     Don't ask Tailscale for a certificate.
       --forget-devices   Remove every paired iPad and exit.
     """)
