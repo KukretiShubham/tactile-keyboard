@@ -2,9 +2,9 @@
 
 What changed in each release of Tactile. Each release's download is on the [releases page](https://github.com/KukretiShubham/tactile-keyboard/releases).
 
-## Unreleased
+## 1.2.0
 
-- **Granola:** a hotkey pack with a Voice Typing key that holds Granola's dictation key for you (hold to talk, double-tap for hands-free), in Granola's own colors. It also sits beside the general shortcuts, so you can dictate into any app. Set your key in Settings if you changed it from fn.
+- **Granola:** a hotkey pack with a Voice Typing key that holds Granola's dictation key for you (hold to talk, double-tap for hands-free), in Granola's own colors. It also sits beside the general shortcuts, so you can dictate into any app. If you changed Granola's key from fn, tap **Change** on the Granola tab (or use Settings) and press yours.
 - **Trackpad only:** in landscape, the trackpad-only layout keeps the shortcut keys and app hotkeys on either side of the trackpad.
 - **One-command install:** `curl -fsSL https://raw.githubusercontent.com/KukretiShubham/tactile-keyboard/main/install.sh | sh` downloads, verifies and installs the latest release.
 - The Mac can now hold fn, for apps that use it as a shortcut.
