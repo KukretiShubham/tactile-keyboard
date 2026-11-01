@@ -26,7 +26,7 @@ enum InputChecks {
         checks.run("key map: every key the iPad sends has a Mac key code") {
             let letters = (UInt8(ascii: "A")...UInt8(ascii: "Z")).map { "Key\(Character(UnicodeScalar($0)))" }
             let digits = (0...9).map { "Digit\($0)" }
-            let others = ["MetaLeft", "MetaRight", "ShiftLeft", "ShiftRight", "AltLeft", "AltRight", "ControlLeft",
+            let others = ["MetaLeft", "MetaRight", "ShiftLeft", "ShiftRight", "AltLeft", "AltRight", "ControlLeft", "Fn",
                           "Tab", "Enter", "Space", "Backspace", "Escape", "Equal", "Minus", "Delete",
                           "PageUp", "PageDown", "Home", "End", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"]
                 + (1...12).map { "F\($0)" }

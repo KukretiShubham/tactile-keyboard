@@ -12,6 +12,8 @@ swift run -c release Tactile     # run in a terminal (QR code and logs print the
 scripts/build-app.sh             # build and sign build/Tactile.app
 ```
 
+`install.sh` is what people run to install a release; try changes to it with `TACTILE_DIR=/tmp/test-apps TACTILE_NO_OPEN=1 sh install.sh`, so your own Applications folder isn't touched.
+
 `swift run Tactile --dry-run` logs input instead of controlling the Mac, and serves a plain-HTTP copy of the page at `http://127.0.0.1:8425` for trying UI changes in a desktop browser. To keep a dry run from touching your real paired devices, give it a throwaway home folder:
 
 ```sh

@@ -28,3 +28,5 @@ jobs:
         run: swift build
       - name: Run the checks
         run: swift run tactile-checks
+      - name: Check the install script
+        run: sh -n install.sh

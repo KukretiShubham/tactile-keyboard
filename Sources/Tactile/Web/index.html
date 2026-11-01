@@ -117,6 +117,12 @@
           <label class="row"><span class="row-label">Follow My Mac's App</span><input type="checkbox" class="switch" data-setting="followMacApp"></label>
         </div>
         <p class="group-footer">Beside the trackpad, hotkeys for the app you're using on your Mac (VS Code, Zed, Xcode, JetBrains, browsers) appear on their own. In a terminal, the Claude Code or Codex tab you picked last stays. Tapping a tab brings that app to the front on your Mac; Claude Code and Codex come back wherever you used them last.</p>
+        <h3 class="group-title">Voice Typing (Granola)</h3>
+        <div class="group">
+          <button class="row row-button row-value" id="voiceKeyButton"><span class="row-label">Voice Typing Key</span><span class="row-detail" id="voiceKeyLabel"></span></button>
+          <label class="row"><span class="row-label">Show with Shortcuts</span><input type="checkbox" class="switch" data-setting="voiceTypingLeft"></label>
+        </div>
+        <p class="group-footer">Hold the Voice Typing key to talk, or double-tap it for hands-free, and Granola types into whatever app you're using. Set it to the same key as in Granola's Settings → Voice typing (fn unless you changed it). With Show with Shortcuts on, it sits beside the general shortcuts as well as on Granola's tab.</p>
         <h3 class="group-title">Apps</h3>
         <div class="group" id="packChoices"></div>
         <p class="group-footer">Apps you switch off don't get a tab, even when they're in front on your Mac.</p>
@@ -192,7 +198,8 @@
         <h2 id="hotkeyTitle">New Hotkey</h2>
         <button class="header-button prominent" id="hotkeyAdd" disabled>Add</button>
       </div>
-      <div class="hotkey-row">
+      <p class="hotkey-note" id="hotkeyNote" hidden>Press the key you use for Voice Typing in Granola (Settings → Voice typing). Tactile holds it down for as long as you hold the Voice Typing key. Granola's default is fn.</p>
+      <div class="hotkey-row" id="hotkeyNameRow">
         <label class="hotkey-field"><span>Name</span><input id="hotkeyName" maxlength="24" autocomplete="off" placeholder="Rerun Tests"></label>
         <div class="segmented" id="hotkeyKind">
           <button data-value="keys" aria-pressed="true">Keys</button><button data-value="text" aria-pressed="false">Text</button>
@@ -207,6 +214,9 @@
         <label class="hotkey-enter"><span>Press Return</span><input type="checkbox" class="switch" id="hotkeyEnter" checked></label>
       </div>
       <div class="hotkey-apps" id="hotkeyApps" role="radiogroup" aria-label="Show for"></div>
+      <div class="hotkey-row" id="hotkeyResetRow" hidden>
+        <button class="hotkey-app" id="hotkeyReset">Reset to fn</button>
+      </div>
     </div>
   </div>
 

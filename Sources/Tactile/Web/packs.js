@@ -9,6 +9,10 @@
 //
 // Without the app's icon (it isn't installed), a tab shows the pack's `badge`.
 //
+// Granola's Voice Typing key (`voice: true`) holds your dictation key down for
+// as long as you touch it (see voice-key.js); it also sits with the general
+// shortcuts, since dictation works in any app.
+//
 // Hotkey format (see hotkeys.js): `keys` pressed together, `times` presses
 // (e.g. Esc Esc), or `text` typed (and Return pressed with `enter`). Single
 // characters follow the Mac's keyboard layout. A hotkey that opens something
@@ -47,6 +51,17 @@ export const PACKS = [
       { name: 'New Chat', text: '/new', enter: true },
       { name: 'Diff', text: '/diff', enter: true },
       { name: 'Review', text: '/review', enter: true },
+    ],
+  },
+  {
+    // Voice Typing and Cancel are from Granola's docs; New Note (⇧⌘N) is in
+    // its app menu, and Quick Chat (⌥Space) is a shortcut its app registers.
+    id: 'granola', name: 'Granola', badge: 'G', apps: ['com.granola.app'],
+    hotkeys: [
+      { name: 'Voice Typing', voice: true },
+      { name: 'New Note', keys: ['MetaLeft', 'ShiftLeft', 'n'] },
+      { name: 'Quick Chat', keys: ['AltLeft', 'Space'] },
+      { name: 'Cancel Dictation', keys: ['Escape'], wide: true },
     ],
   },
   {

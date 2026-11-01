@@ -28,7 +28,8 @@ Put your Mac on a stand, keep the iPad in front of you, and type and point with 
 - **Rest your fingers.** Fingers resting on the keys don't type; keys type when you lift. Rolled keys still come out in the right order.
 - **A proper trackpad.** Tap to click, two-finger click, two-finger scroll with momentum, pinch to zoom, drag, three-finger drag, and swipes for Spaces, Mission Control and App Exposé.
 - **Laid out like a MacBook.** In landscape the trackpad sits centred below the keyboard, and the palm rests either side hold big shortcut keys: Undo, Redo, Copy, Paste, Switch App, Spotlight and more. You pick which.
-- **Hotkeys for the apps you code in.** Ready-made keys for Claude Code, Codex, VS Code, Zed, Xcode, JetBrains IDEs and browsers, shown with each app's own icon. They switch to whichever app you're using on the Mac, and you can record your own.
+- **Hotkeys for the apps you work in.** Ready-made keys for Claude Code, Codex, Granola, VS Code, Zed, Xcode, JetBrains IDEs and browsers, shown with each app's own icon. They switch to whichever app you're using on the Mac, and you can record your own.
+- **Talk instead of type.** With Granola installed, a Voice Typing key holds Granola's dictation key for you: hold to talk, double-tap for hands-free, in any app.
 - **Private and secure.** Everything stays between your iPad and your Mac, encrypted with TLS. Pairing takes a one-time code, and over Tailscale only your own devices can connect.
 - **Nothing to patch.** No third-party packages on either side: Apple frameworks on the Mac, plain HTML, CSS and JavaScript on the iPad.
 
@@ -53,16 +54,30 @@ Midnight Glow comes in eight glow colors:
 
 You need a Mac with **macOS 15 or later**, plus an iPad (any device with a modern browser works) on the same Wi-Fi network or the same [Tailscale](https://tailscale.com) network.
 
-### Download (easiest)
+### Install with one command (easiest)
 
-1. **Download** `Tactile-<version>.zip` from the [latest release](https://github.com/KukretiShubham/tactile-keyboard/releases/latest), unzip it, and move **Tactile.app** to Applications. It runs on Apple silicon and Intel Macs.
-2. **Open it the first time:** Tactile is free and open source, so it isn't notarized by Apple, and macOS blocks it at first. Open it once, then go to System Settings → Privacy & Security, scroll down, and click **Open Anyway** next to Tactile.
-3. **Allow Accessibility:** macOS asks you to allow Tactile in System Settings → Privacy & Security → Accessibility. Every app that types or moves the pointer needs this.
-4. **Pair your iPad:** click the Tactile icon in the menu bar, choose **Pair a Device…**, and scan the QR code with the iPad's camera. With Tailscale, the scan pairs too; on Wi-Fi only, type the six-digit code it shows (see below).
+Paste this into Terminal:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/KukretiShubham/tactile-keyboard/main/install.sh | sh
+```
+
+It downloads the latest release, checks its checksum (and its build provenance, if you have the [GitHub CLI](https://cli.github.com)), installs **Tactile.app** in Applications and opens it. Run it again to update. To remove Tactile, add `-s -- --uninstall` after `sh`. The script is short; [read it](install.sh) first if you like.
+
+Then:
+
+1. **Allow Accessibility:** macOS asks you to allow Tactile in System Settings → Privacy & Security → Accessibility. Every app that types or moves the pointer needs this.
+2. **Pair your iPad:** click the Tactile icon in the menu bar, choose **Pair a Device…**, and scan the QR code with the iPad's camera. With Tailscale, the scan pairs too; on Wi-Fi only, type the six-digit code it shows (see below).
 
 Then tap Share → **Add to Home Screen** on the iPad for a full-screen app without Safari's toolbar.
 
-When you install a newer version, switch Tactile off and on again under Accessibility: macOS treats each download as a new app.
+When you install a newer version, switch Tactile off and on again under Accessibility: macOS treats each version as a new app.
+
+### Download it yourself
+
+1. **Download** `Tactile-<version>.zip` from the [latest release](https://github.com/KukretiShubham/tactile-keyboard/releases/latest), unzip it, and move **Tactile.app** to Applications. It runs on Apple silicon and Intel Macs.
+2. **Open it the first time:** Tactile is free and open source, so it isn't notarized by Apple, and macOS blocks a downloaded copy at first. Open it once, then go to System Settings → Privacy & Security, scroll down, and click **Open Anyway** next to Tactile.
+3. Allow Accessibility and pair your iPad, as above.
 
 <details>
 <summary>Check that a download is genuine</summary>
@@ -93,7 +108,7 @@ gh attestation verify Tactile-v<version>.zip --repo KukretiShubham/tactile-keybo
    cd tactile-keyboard
    ```
 3. **Build and open it:** double-click `start-tactile.command` (or run `./start-tactile.command`). It builds **Tactile.app** and opens it in your menu bar. The first build takes a few minutes. You can move `build/Tactile.app` to Applications afterwards.
-4. Allow Accessibility and pair your iPad, as in steps 3 and 4 above.
+4. Allow Accessibility and pair your iPad, as above.
 
 ### Connecting over Tailscale (recommended)
 
@@ -155,11 +170,11 @@ Tap the settings button (top right):
 - **App Hotkeys:** **Follow My Mac's App** switches the hotkeys beside the trackpad to the app in front on the Mac. **Apps** has a switch per app, to hide the tabs you don't use. **My Hotkeys** lists the hotkeys you made, to delete them.
 - **Feedback:** key sounds, Soft, Crisp or Thock, volume, Sound in Silent Mode, and vibration on devices that have it.
 - **Trackpad:** tracking speed, scrolling speed, natural scrolling, Pinch to Zoom, Three-Finger Drag.
-- **Layout:** keyboard, trackpad or both (in landscape, both gives the MacBook-style layout with the trackpad centred); keyboard at the top, middle or bottom; **Expanded** or **Floating** keyboard; **Keep Screen Awake** (the iPad stays on while you use it, and sleeps normally after 10 idle minutes).
+- **Layout:** keyboard, trackpad or both (in landscape, both gives the MacBook-style layout with the trackpad centred, and trackpad-only keeps the shortcut keys on either side); keyboard at the top, middle or bottom; **Expanded** or **Floating** keyboard; **Keep Screen Awake** (the iPad stays on while you use it, and sleeps normally after 10 idle minutes).
 
 ### App hotkeys
 
-In landscape with the trackpad showing, the right side of the trackpad has a row of app tabs, each with that app's hotkeys: Claude Code, Codex, VS Code, Zed, Xcode, JetBrains IDEs and browsers. They follow the app in front on your Mac, tapping a tab brings that app forward, and a second tap closes what a hotkey opened. Tap **+** to record your own. The full list and how each one behaves is in [docs/app-hotkeys.md](docs/app-hotkeys.md).
+In landscape with the trackpad showing, the right side of the trackpad has a row of app tabs, each with that app's hotkeys: Claude Code, Codex, Granola (with a hold-to-talk Voice Typing key), VS Code, Zed, Xcode, JetBrains IDEs and browsers. They follow the app in front on your Mac, tapping a tab brings that app forward, and a second tap closes what a hotkey opened. Tap **+** to record your own. The full list and how each one behaves is in [docs/app-hotkeys.md](docs/app-hotkeys.md).
 
 ### The menu bar
 

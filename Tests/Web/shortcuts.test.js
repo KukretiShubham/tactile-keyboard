@@ -57,7 +57,7 @@ function setup(overrides = {}) {
   const sent = [];
   const settings = fakeSettings({
     shortcutBar: true, shortcuts: ['undo', 'copy', 'spotlight'], pack: 'claude', terminalPack: 'claude',
-    lastTerminal: 'com.apple.Terminal', agentHomes: {}, hiddenPacks: [],
+    lastTerminal: 'com.apple.Terminal', agentHomes: {}, hiddenPacks: [], voiceTypingKeys: ['Fn'], voiceTypingLeft: true,
     followMacApp: true, customHotkeys: [], ...overrides,
   });
   const shortcuts = createShortcuts(parts, {

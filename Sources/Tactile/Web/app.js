@@ -74,6 +74,7 @@ const shortcuts = createShortcuts({
   send, feedback, settings,
   beforeSend: () => keyboard.releaseLatched(),
   onAddHotkey: (pack) => hotkeyEditor.open(pack),
+  onVoiceKey: () => hotkeyEditor.openVoiceKey(),
 });
 const hotkeyEditor = createHotkeyEditor({
   settings, feedback, deck,
@@ -87,6 +88,7 @@ const pairingSheet = createPairingSheet(connection);
 const sheets = setupSheets({
   connection, feedback, settings, typingModel,
   onNewHotkey: () => hotkeyEditor.open(),
+  onVoiceKey: () => hotkeyEditor.openVoiceKey(),
   packChoices: () => shortcuts.offered(),
 });
 
@@ -130,7 +132,7 @@ function fit() {
   // In landscape, height is what's scarce: with the trackpad showing, it sits
   // centred like a MacBook's, and the top bar's controls move to the palm
   // rests either side of it instead of taking a row of their own.
-  const palmRests = layout === 'both' && innerWidth > innerHeight;
+  const palmRests = (layout === 'both' || layout === 'trackpad') && innerWidth > innerHeight;
   app.dataset.controls = palmRests ? 'palm' : 'bar';
   placeControls(palmRests);
   const { width, height, paddingLeft, paddingTop } = contentBox(stage);
@@ -239,6 +241,7 @@ connection.addEventListener('state', ({ detail: state }) => {
   if (state !== 'ready') {
     keyboard.reset();
     trackpad.reset();
+    shortcuts.releaseVoice();
   }
 });
 connection.addEventListener('denied', ({ detail }) => {
@@ -265,6 +268,7 @@ setTimeout(showSoundHint, 1500);
 // Never leave a key or button held on the Mac when the iPad looks away.
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) return;
+  shortcuts.releaseVoice();
   send({ t: 'rel' });
   keyboard.reset();
   trackpad.reset();

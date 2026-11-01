@@ -8,6 +8,7 @@ import { canReverse, glyphOf, hotkeyMessages, isCustomHotkey, reverseMessages, s
 import { ICONS } from './icons.js';
 import { iconApps, packForApp, PACKS, TERMINALS } from './packs.js';
 import { el } from './util.js';
+import { createVoiceKey, createVoiceState, DEFAULT_VOICE_KEYS, voiceKeyLabel } from './voice-key.js';
 
 export const SHORTCUTS = [
   { id: 'undo', name: 'Undo', keys: ['MetaLeft', 'z'] },
@@ -30,7 +31,7 @@ export const DEFAULT_SHORTCUTS = ['undo', 'redo', 'copy', 'paste', 'switchApp', 
 /** Every app bundle ID whose icon the packs might show (asked of the Mac). */
 export const PACK_ICON_APPS = [...new Set(PACKS.flatMap(iconApps))];
 
-export function createShortcuts({ bar, left, right, tabs, title, add }, { send, feedback, settings, beforeSend, onAddHotkey }) {
+export function createShortcuts({ bar, left, right, tabs, title, add }, { send, feedback, settings, beforeSend, onAddHotkey, onVoiceKey = () => {} }) {
   let labels = {};
   let besideTrackpad = false;
   let icons = {}; // bundle ID → icon, for apps installed on the Mac
@@ -38,9 +39,26 @@ export function createShortcuts({ bar, left, right, tabs, title, add }, { send, 
   // Hotkeys switched on (e.g. a panel opened), so the next tap closes them.
   // Tactile can't see the app, so this is a best guess; it lights the key.
   const switchedOn = new Map(); // key id → hotkey
+  // Granola's Voice Typing. While its key is held, redrawing waits, so the
+  // finger's lift is never lost (which would leave the key held on the Mac).
+  const voice = createVoiceState(send);
+  let redrawWhenLifted = false;
+  voice.onSettled = () => {
+    if (redrawWhenLifted) render();
+  };
+  const granola = PACKS.find(({ id }) => id === 'granola');
+  const VOICE_TYPING = { id: 'voiceTyping', name: 'Voice Typing', voice: true };
+  const voiceKeys = () => {
+    const keys = settings.get('voiceTypingKeys');
+    return Array.isArray(keys) && keys.length && keys.every((key) => typeof key === 'string') ? keys : DEFAULT_VOICE_KEYS;
+  };
 
   const custom = () => (settings.get('customHotkeys') ?? []).filter(isCustomHotkey);
   const general = () => (settings.get('shortcutBar') ? SHORTCUTS.filter(({ id }) => settings.get('shortcuts').includes(id)) : []);
+  // Dictation works in any app, so with Granola installed its key also sits
+  // with the general shortcuts (unless Granola's own tab is already showing it).
+  const voiceWithGeneral = () => settings.get('voiceTypingLeft') !== false && offeredPacks().includes(granola) &&
+    !isHidden(granola) && !(besideTrackpad && currentPack() === granola);
   // Terminal agents are always offered; app packs once their app is found.
   // You can hide any of them in Settings.
   const offeredPacks = () => PACKS.filter((pack) => pack.terminal || pack.apps.some((id) => id in icons));
@@ -91,13 +109,14 @@ export function createShortcuts({ bar, left, right, tabs, title, add }, { send, 
   // sound. `id` tells keys apart, for remembering which are switched on.
   // `pack` is the app pack the key belongs to, if any.
   function button(hotkey, position, id, pack = null) {
+    if (hotkey.voice) return createVoiceKey(voice, { feedback, keys: voiceKeys, logo: packIcon(granola), position });
     if (hotkey.start) hotkey = { ...hotkey, text: `$ ${pack.command}` };
     const glyph = hotkey.icon
       ? el('span', { className: 'shortcut-glyph shortcut-icon', html: hotkey.icon })
       : el('span', { className: hotkey.text ? 'shortcut-glyph shortcut-text' : 'shortcut-glyph', text: glyphOf(hotkey) });
     const on = switchedOn.has(id);
     const key = el('button', {
-      className: `${besideTrackpad ? 'shortcut' : 'shortcut glass'}${on ? ' on' : ''}`,
+      className: `${besideTrackpad ? 'shortcut' : 'shortcut glass'}${on ? ' on' : ''}${hotkey.wide ? ' wide' : ''}`,
       attrs: { 'aria-label': hotkey.name, title: hotkey.name, ...(canReverse(hotkey) ? { 'aria-pressed': on } : {}) },
     }, el('span', { className: 'shortcut-label' }, glyph, el('span', { className: 'shortcut-name', text: hotkey.name })));
     key.addEventListener('click', () => {
@@ -136,7 +155,9 @@ export function createShortcuts({ bar, left, right, tabs, title, add }, { send, 
   }
 
   function render() {
-    const shown = general().concat(custom().filter((hotkey) => hotkey.pack === 'all'));
+    redrawWhenLifted = Boolean(voice.press);
+    if (redrawWhenLifted) return;
+    const shown = [...(voiceWithGeneral() ? [VOICE_TYPING] : []), ...general(), ...custom().filter((hotkey) => hotkey.pack === 'all')];
     bar.replaceChildren(...(besideTrackpad ? [] : shown.map((hotkey) => button(hotkey, 0, hotkey.id))));
     bar.hidden = besideTrackpad || shown.length === 0;
     left.replaceChildren(...(besideTrackpad ? shown.map((hotkey) => button(hotkey, -0.9, hotkey.id)) : []));
@@ -160,17 +181,26 @@ export function createShortcuts({ bar, left, right, tabs, title, add }, { send, 
     let where = isFollowing(pack) ? 'following your Mac' : '';
     if (pack.terminal) where = `in ${isFollowing(pack) ? frontApp.name : (homeOf(pack)?.name ?? 'Terminal')}`;
     title.replaceChildren(pack.name, ...(where ? [' ', el('small', { text: where })] : []));
+    // Granola's dictation key differs per person, so it can be changed right here.
+    if (pack === granola) {
+      const change = el('button', { className: 'pack-title-action', text: `${voiceKeyLabel(voiceKeys())} · Change`,
+        attrs: { 'aria-label': `Voice Typing key: ${voiceKeyLabel(voiceKeys())}. Change` } });
+      change.addEventListener('click', onVoiceKey);
+      title.append(change);
+    }
     const hotkeys = pack.hotkeys.concat(custom().filter((hotkey) => hotkey.pack === pack.id));
     right.replaceChildren(...hotkeys.map((hotkey, index) => button(hotkey, 0.9, hotkey.id ?? `${pack.id}:${index}`, pack)));
   }
 
   add.addEventListener('click', () => onAddHotkey(currentPack()?.id ?? 'all'));
   settings.subscribe((key) => {
-    if (['shortcuts', 'shortcutBar', 'customHotkeys', 'pack', 'hiddenPacks'].includes(key)) render();
+    if (['shortcuts', 'shortcutBar', 'customHotkeys', 'pack', 'hiddenPacks', 'voiceTypingKeys', 'voiceTypingLeft'].includes(key)) render();
   });
   render();
 
   return {
+    /** Lets go of a held Voice Typing key, e.g. when the iPad looks away. */
+    releaseVoice: () => voice.release(),
     /** You typed or clicked: palettes opened by a hotkey have closed. */
     noteInput() {
       let changed = false;

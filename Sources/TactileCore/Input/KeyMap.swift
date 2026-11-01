@@ -22,6 +22,8 @@ public enum KeyMap {
 
         "MetaLeft": 0x37, "MetaRight": 0x36, "ShiftLeft": 0x38, "ShiftRight": 0x3C,
         "AltLeft": 0x3A, "AltRight": 0x3D, "ControlLeft": 0x3B, "ControlRight": 0x3E,
+        // fn (Globe) is held like a modifier, e.g. as a dictation key.
+        "Fn": 0x3F,
 
         "F1": 0x7A, "F2": 0x78, "F3": 0x63, "F4": 0x76, "F5": 0x60, "F6": 0x61,
         "F7": 0x62, "F8": 0x64, "F9": 0x65, "F10": 0x6D, "F11": 0x67, "F12": 0x6F,
@@ -40,6 +42,7 @@ public enum KeyMap {
         0x38: .maskShift, 0x3C: .maskShift,
         0x3A: .maskAlternate, 0x3D: .maskAlternate,
         0x3B: .maskControl, 0x3E: .maskControl,
+        0x3F: .maskSecondaryFn,
     ]
 
     /// Keys a hardware Mac keyboard reports with the fn (and keypad) flag set.

@@ -2,6 +2,13 @@
 
 What changed in each release of Tactile. Each release's download is on the [releases page](https://github.com/KukretiShubham/tactile-keyboard/releases).
 
+## Unreleased
+
+- **Granola:** a hotkey pack with a Voice Typing key that holds Granola's dictation key for you (hold to talk, double-tap for hands-free), in Granola's own colors. It also sits beside the general shortcuts, so you can dictate into any app. Set your key in Settings if you changed it from fn.
+- **Trackpad only:** in landscape, the trackpad-only layout keeps the shortcut keys and app hotkeys on either side of the trackpad.
+- **One-command install:** `curl -fsSL https://raw.githubusercontent.com/KukretiShubham/tactile-keyboard/main/install.sh | sh` downloads, verifies and installs the latest release.
+- The Mac can now hold fn, for apps that use it as a shortcut.
+
 ## 1.1.0
 
 - **App hotkeys.** Keys beside the trackpad for Claude Code, Codex, VS Code, Zed, Xcode, JetBrains IDEs and browsers, shown with each app's own icon from your Mac. They follow the app in front, tapping a tab brings that app forward, and you can hide the ones you don't use.

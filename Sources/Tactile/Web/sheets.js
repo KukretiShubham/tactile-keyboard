@@ -1,5 +1,6 @@
 import { ICONS } from './icons.js';
 import { glyphOf, isCustomHotkey } from './hotkeys.js';
+import { DEFAULT_VOICE_KEYS, voiceKeyLabel } from './voice-key.js';
 import { SHORTCUTS } from './shortcuts.js';
 import { closeSheet, el, openSheet } from './util.js';
 
@@ -23,7 +24,7 @@ function miniKeyboard(skin) {
 }
 
 /** Settings, and Type on iPad. Returns `sync`, to redraw after outside changes. */
-export function setupSheets({ connection, feedback, settings, typingModel, onNewHotkey, packChoices }) {
+export function setupSheets({ connection, feedback, settings, typingModel, onNewHotkey, onVoiceKey, packChoices }) {
   document.querySelectorAll('[data-icon]').forEach((node) => { node.innerHTML = ICONS[node.dataset.icon]; });
 
   // Settings
@@ -115,6 +116,16 @@ export function setupSheets({ connection, feedback, settings, typingModel, onNew
   document.getElementById('newHotkeyButton').addEventListener('click', () => {
     closeSheet(settingsSheet);
     onNewHotkey();
+  });
+
+  // The key Granola listens for, shown by name; tapping it opens the picker.
+  const voiceKeyLabelText = document.getElementById('voiceKeyLabel');
+  const showVoiceKey = () => { voiceKeyLabelText.textContent = voiceKeyLabel(settings.get('voiceTypingKeys') ?? DEFAULT_VOICE_KEYS); };
+  settings.subscribe((key) => { if (key === 'voiceTypingKeys') showVoiceKey(); });
+  showVoiceKey();
+  document.getElementById('voiceKeyButton').addEventListener('click', () => {
+    closeSheet(settingsSheet);
+    onVoiceKey();
   });
 
   const resetTyping = document.getElementById('resetTyping');

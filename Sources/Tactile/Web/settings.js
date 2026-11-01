@@ -2,6 +2,7 @@
 // browsing), so every access is guarded and defaults always apply.
 import { DEFAULT_SHORTCUTS } from './shortcuts.js';
 import { storage } from './util.js';
+import { DEFAULT_VOICE_KEYS } from './voice-key.js';
 
 const KEY = 'tactile.settings.v1';
 
@@ -35,6 +36,8 @@ const DEFAULTS = {
   lastTerminal: 'com.apple.Terminal',
   agentHomes: {},
   hiddenPacks: [],
+  voiceTypingKeys: DEFAULT_VOICE_KEYS,
+  voiceTypingLeft: true,
   followMacApp: true,
   customHotkeys: [],
   keepAwake: true,
