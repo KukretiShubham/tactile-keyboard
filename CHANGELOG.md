@@ -2,7 +2,7 @@
 
 What changed in each release of Tactile. Each release's download is on the [releases page](https://github.com/KukretiShubham/tactile-keyboard/releases).
 
-## Unreleased
+## 1.3.0
 
 - **Send right after you talk:** Esc, Delete and **Send** (Return) now sit right under the Voice Typing key, so you can dictate and send with one hand. In Trackpad only they're the first Return, Delete and Esc on screen.
 - **Cancel:** while Granola listens, Esc becomes **Cancel**. Slide off the Voice Typing key onto it to throw the words away instead of pasting them. Any Esc now stops the key showing hands-free.
