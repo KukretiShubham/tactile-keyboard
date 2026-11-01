@@ -79,6 +79,14 @@ test('with Rest Fingers on, a resting finger types nothing', async (sandbox) => 
   expectEqual(sent, [], 'messages');
 });
 
+test('with Rest Fingers on, a slow, deliberate Return still types', async (sandbox) => {
+  const { key, sent } = setup(sandbox, { restFingers: true });
+  touch(key('Enter'), 'pointerdown', 6);
+  await wait(700);
+  touch(key('Enter'), 'pointerup', 6);
+  expectEqual(sent.map((m) => `${m.t}:${m.k}`), ['kd:Enter', 'ku:Enter'], 'messages');
+});
+
 test('with Rest Fingers on, rolled keys keep their order', async (sandbox) => {
   const { key, sent } = setup(sandbox, { restFingers: true });
   touch(key('KeyT'), 'pointerdown', 7);

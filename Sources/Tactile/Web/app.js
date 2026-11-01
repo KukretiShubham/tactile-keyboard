@@ -39,7 +39,7 @@ const deck = document.getElementById('keyboard');
 const typingModel = new TypingModel(storage);
 // Typing or clicking closes any palette a hotkey opened (see shortcuts.js).
 const sendInput = (message) => {
-  if (message.t === 'kd' || message.t === 'md') shortcuts.noteInput();
+  if (message.t === 'kd' || message.t === 'md') shortcuts.noteInput(message);
   send(message);
 };
 // While a new hotkey is being recorded, the keyboard's presses go to the
@@ -66,6 +66,7 @@ const trackpad = createTrackpad(document.getElementById('trackpad'), {
 const shortcuts = createShortcuts({
   bar: document.getElementById('shortcutBar'),
   left: document.getElementById('shortcutsLeft'),
+  middle: document.getElementById('shortcutsMiddle'),
   right: document.getElementById('shortcutsRight'),
   tabs: document.getElementById('packTabs'),
   title: document.getElementById('packTitle'),
@@ -131,10 +132,14 @@ function fit() {
   app.dataset.size = size;
   // In landscape, height is what's scarce: with the trackpad showing, it sits
   // centred like a MacBook's, and the top bar's controls move to the palm
-  // rests either side of it instead of taking a row of their own.
-  const palmRests = (layout === 'both' || layout === 'trackpad') && innerWidth > innerHeight;
-  app.dataset.controls = palmRests ? 'palm' : 'bar';
-  placeControls(palmRests);
+  // rests either side of it instead of taking a row of their own. Keyboard
+  // only, at its Fit size, gets the same palm rests as a shelf under the keys
+  // (unless the keys are asked to sit mid-screen), instead of empty glass.
+  const shelf = layout === 'keyboard' && size === 'fit' && settings.get('keyboardPosition') !== 'middle';
+  const palmRests = (layout === 'both' || layout === 'trackpad' || shelf) && innerWidth > innerHeight;
+  const place = palmRests ? (shelf ? 'shelf' : 'beside') : null;
+  app.dataset.controls = place ? 'palm' : 'bar';
+  placeControls(place);
   const { width, height, paddingLeft, paddingTop } = contentBox(stage);
 
   const gap = clamp(width * 0.0055, 4, 8);
@@ -146,7 +151,7 @@ function fit() {
   const rows = functionRow ? 5.55 : 5;
   const rowGaps = functionRow ? 5 : 4;
   const unitFromWidth = (width - 2 * pad - 13.5 * gap) / 14.5;
-  const keyboardHeight = layout === 'both' ? height * 0.62 - stageGap / 2 : height;
+  const keyboardHeight = layout === 'both' || place === 'shelf' ? height * 0.62 - stageGap / 2 : height;
   const unitFromHeight = (keyboardHeight - 2 * pad - rowGaps * gap) / (rows * keyHeightRatio);
   let unit = Math.max(20, Math.floor(Math.min(unitFromWidth, unitFromHeight) * 10) / 10);
 
@@ -189,20 +194,19 @@ function fit() {
   }
 }
 
-// Moves the status, buttons and shortcuts between the top bar and the palm
-// rests beside the trackpad.
-let controlsOnPalmRests = false;
-function placeControls(onPalmRests) {
-  if (onPalmRests === controlsOnPalmRests) return;
-  controlsOnPalmRests = onPalmRests;
-  if (onPalmRests) {
-    palmTop.append(status, toolbarActions);
-    palmTop.after(soundHint);
+// Moves the status, buttons and shortcuts between the top bar (null) and the
+// palm rests, 'beside' the trackpad or on the 'shelf' under the keys.
+let controlsPlace = null;
+function placeControls(place) {
+  if (place === controlsPlace) return;
+  controlsPlace = place;
+  if (place) {
+    palmTop.append(status, soundHint, toolbarActions);
   } else {
     toolbar.prepend(status, soundHint);
     toolbar.append(toolbarActions);
   }
-  shortcuts.placeBesideTrackpad(onPalmRests);
+  shortcuts.placeOnPalmRests(place);
 }
 
 settings.subscribe((key) => {

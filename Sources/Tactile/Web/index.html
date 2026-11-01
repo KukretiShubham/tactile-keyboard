@@ -23,8 +23,8 @@
         <span class="status-dot"></span>
         <span class="status-label" id="statusLabel">Connecting…</span>
       </div>
-      <button class="glass sound-hint" id="soundHint" hidden>
-        <span data-icon="speaker"></span>Tap to enable key sounds
+      <button class="glass sound-hint" id="soundHint" aria-label="Tap to enable key sounds" hidden>
+        <span data-icon="speaker"></span><span class="sound-hint-text">Tap to enable key sounds</span>
       </button>
       <nav class="shortcut-bar" id="shortcutBar" aria-label="Shortcuts"></nav>
       <div class="toolbar-actions">
@@ -36,7 +36,8 @@
     <main class="stage" id="stage">
       <section class="deck" id="keyboard" aria-label="Keyboard"></section>
       <!-- In landscape with both showing, the trackpad sits centred like a
-           MacBook's, with the status, buttons and shortcuts either side. -->
+           MacBook's, with the status, buttons and shortcuts either side.
+           Keyboard only puts the same palm rests on a shelf under the keys. -->
       <div class="palm">
         <aside class="palm-side" id="palmLeft" aria-label="Status and shortcuts">
           <div class="palm-top" id="palmTop"></div>
@@ -45,6 +46,8 @@
         <section class="trackpad" id="trackpad" aria-label="Trackpad">
           <p class="trackpad-hint">Tap to click · Two fingers to scroll or pinch · Hold, then move to drag</p>
         </section>
+        <!-- Keyboard only: the general shortcuts, on the shelf under the keys. -->
+        <div class="shortcut-keys shelf-keys" id="shortcutsMiddle"></div>
         <aside class="palm-side palm-right" id="palmRight" aria-label="App hotkeys and settings">
           <div class="pack-row">
             <div class="pack-tabs" id="packTabs" role="group" aria-label="Apps"></div>
@@ -181,7 +184,7 @@
           </div>
           <label class="row"><span class="row-label">Keep Screen Awake</span><input type="checkbox" class="switch" data-setting="keepAwake"></label>
         </div>
-        <p class="group-footer" id="sizeNote">Expanded makes the keys taller to fill the screen. Floating lets you drag the keyboard by its handle and resize it from the corner; double-tap the handle to reset.</p>
+        <p class="group-footer" id="sizeNote">In landscape, Fit puts Voice Typing, Send and your shortcuts on a shelf under the keys (unless the keyboard is in the middle). Expanded makes the keys taller to fill the screen. Floating lets you drag the keyboard by its handle and resize it from the corner; double-tap the handle to reset.</p>
 
         <div class="group">
           <button class="row row-button destructive" id="forgetButton">Forget This iPad</button>

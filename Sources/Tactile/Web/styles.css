@@ -325,17 +325,17 @@ html { touch-action: none; }
 .shortcut-keys .shortcut-label { flex-direction: column; gap: clamp(2px, 6cqh, 6px); }
 .shortcut-keys .shortcut-glyph { font-size: clamp(13px, 30cqh, 22px); white-space: nowrap; }
 .shortcut-keys .shortcut-icon svg { width: clamp(16px, 34cqh, 26px); height: clamp(16px, 34cqh, 26px); }
-/* Short keys put the symbol and name side by side on one line. */
-@container (max-height: 54px) {
+/* Short, wide keys put the symbol and name side by side on one line; short,
+   narrow ones keep them stacked, shrinking down to a 10px name. */
+@container (max-height: 54px) and (min-width: 100px) {
+  .shortcut-keys .shortcut-label { flex-direction: row; gap: 7px; }
   .shortcut-keys .shortcut-glyph, .shortcut-keys .shortcut-text { font-size: 15px; }
   .shortcut-keys .shortcut-icon svg { width: 18px; height: 18px; }
   .shortcut-keys .shortcut-name { font-size: 12px; }
 }
-@container (max-height: 54px) and (min-width: 100px) {
-  .shortcut-keys .shortcut-label { flex-direction: row; gap: 7px; }
-}
-/* Very small keys show only the symbol (the name is still read out by VoiceOver). */
-@container (max-height: 30px) {
+/* Very small keys show only the symbol (the name is still read out by
+   VoiceOver). Wide ones, like Send, keep their name beside it. */
+@container (max-height: 27px) and (max-width: 99px) {
   .shortcut-keys .shortcut-name { display: none; }
 }
 /* Keys that take a whole row, e.g. Granola's Cancel Dictation. */
@@ -373,13 +373,17 @@ html { touch-action: none; }
   text-align: left;
   transition: background 160ms ease, box-shadow 220ms ease, transform 120ms var(--ease);
 }
-.shortcut-keys .voice-key { grid-column: span 2; grid-row: span 2; }
+.shortcut-keys .voice-key { grid-column: 1 / -1; grid-row: span 2; }
+.shortcut-keys.three-up { grid-template-columns: repeat(3, 1fr); }
+/* Under the keyboard, it gives up a row to the Send row below it. */
+[data-layout="both"] .shortcut-keys .voice-key { grid-row: span 1; }
 .voice-logo { flex: none; width: 40px; height: 40px; border-radius: 10px; background: var(--granola-paper); display: grid; place-items: center; }
 .voice-logo:empty { display: none; }
 .voice-logo img { width: 30px; height: 30px; }
 .voice-words { display: flex; flex-direction: column; gap: 3px; min-width: 0; padding-bottom: 4px; }
 .voice-title { font: 500 19px/1.15 var(--granola-serif); letter-spacing: -0.01em; white-space: nowrap; }
 .voice-hint { font: 500 12px/1.3 var(--font); opacity: 0.72; }
+.voice-target { font-weight: 650; }
 .voice-cap {
   position: absolute;
   right: 10px;
@@ -407,9 +411,19 @@ html { touch-action: none; }
 .voice-key:not([data-state="idle"]) .voice-cap { background: rgba(247, 247, 243, 0.12); }
 /* Smaller keys keep the essentials. */
 @container (max-height: 84px) {
-  .voice-hint { display: none; }
   .voice-logo { width: 32px; height: 32px; border-radius: 8px; }
   .voice-logo img { width: 24px; height: 24px; }
+}
+@container (max-height: 56px) {
+  .voice-hint { display: none; }
+  /* The key's name moves into the row, so it can't cover the title. */
+  .voice-cap { position: static; flex: none; margin-left: auto; }
+  .voice-words { flex: 1; padding-bottom: 0; }
+  .voice-title { overflow: hidden; text-overflow: ellipsis; }
+  .voice-wave i:nth-child(n + 9) { display: none; }
+  /* The logo fits the key's face, above its 5px bevel. */
+  .voice-logo { width: clamp(18px, calc(100cqh - 13px), 32px); height: clamp(18px, calc(100cqh - 13px), 32px); margin-bottom: 5px; border-radius: 6px; }
+  .voice-logo img { width: 75%; height: 75%; }
 }
 @container (max-width: 230px) {
   .voice-wave { display: none !important; }
@@ -423,6 +437,20 @@ html { touch-action: none; }
 @media (prefers-reduced-motion: reduce) {
   .voice-wave i { animation: none; }
 }
+
+/* Esc, Delete and Send, under the Voice Typing key. While Granola listens,
+   Esc is Cancel, outlined in Granola's green, and lights up when a finger
+   slides onto it from the Voice Typing key. */
+.send-row { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr 1.7fr; gap: var(--g); min-height: 0; }
+.send-row .shortcut { min-width: 0; }
+.send-row .send .shortcut-glyph, .send-row .send .shortcut-name { color: var(--accent); }
+.send-row .send .shortcut-name { font-weight: 600; opacity: 1; }
+:root { --cancel-ink: #5D6B1F; }
+[data-skin="space-black"], [data-skin="midnight"], [data-skin="frosted"] { --cancel-ink: var(--granola-lime); }
+.shortcut-keys .shortcut.cancel { box-shadow: inset 0 0 0 2px var(--granola-glow), 0 0 14px rgba(155, 193, 81, 0.45); }
+.send-row .cancel .shortcut-glyph, .send-row .cancel .shortcut-name { color: var(--cancel-ink); }
+.shortcut-keys .shortcut.cancel.armed { background: var(--granola-pill); }
+.send-row .cancel.armed .shortcut-glyph, .send-row .cancel.armed .shortcut-name { color: var(--granola-lime); }
 
 /* Switched on (a panel it opened is showing): tap again to close. */
 .shortcut-keys .shortcut.on { background: var(--key-bg-on); border-color: var(--key-border-pressed); }
@@ -441,7 +469,7 @@ html { touch-action: none; }
 .shortcut-bar .shortcut.on { box-shadow: inset 0 0 0 2px var(--accent), var(--glass-shadow); }
 .shortcut-keys .shortcut-name {
   max-width: 100%;
-  font-size: clamp(10px, 17cqh, 12px);
+  font-size: clamp(10px, 22cqh, 12px);
   /* Room for descenders (g, p, y), which the ellipsis's clipping would cut. */
   line-height: 1.3;
   text-align: center;
@@ -732,6 +760,11 @@ html { touch-action: none; }
 
 [data-layout="keyboard"] .trackpad,
 [data-layout="trackpad"] .deck { display: none; }
+/* Keyboard only's shelf: the general shortcuts sit under the space bar, where
+   the trackpad would be. */
+.shortcut-keys.shelf-keys { display: none; }
+[data-layout="keyboard"][data-controls="palm"] .shortcut-keys.shelf-keys { display: grid; grid-template-columns: repeat(3, 1fr); }
+[data-layout="keyboard"][data-controls="palm"][data-position="bottom"] .deck { order: 2; }
 
 /* ───────────────────────── Keyboard ───────────────────────── */
 
@@ -1127,7 +1160,12 @@ html { touch-action: none; }
   cursor: pointer;
 }
 .sound-hint[hidden] { display: none; }
-.sound-hint span, .sound-hint svg { width: 18px; height: 18px; display: block; color: var(--accent); }
+.sound-hint [data-icon], .sound-hint svg { width: 18px; height: 18px; display: block; color: var(--accent); }
+/* On the palm rests it's a round button beside Settings, so it doesn't take
+   a row from the shortcuts below. */
+[data-controls="palm"] .sound-hint { flex: none; justify-content: center; width: 44px; height: 44px; padding: 0; border-radius: 50%; }
+[data-controls="palm"] .sound-hint-text { display: none; }
+[data-controls="palm"] .sound-hint [data-icon], [data-controls="palm"] .sound-hint svg { width: 22px; height: 22px; }
 
 /* Switch */
 .switch {

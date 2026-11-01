@@ -2,6 +2,14 @@
 
 What changed in each release of Tactile. Each release's download is on the [releases page](https://github.com/KukretiShubham/tactile-keyboard/releases).
 
+## Unreleased
+
+- **Send right after you talk:** Esc, Delete and **Send** (Return) now sit right under the Voice Typing key, so you can dictate and send with one hand. In Trackpad only they're the first Return, Delete and Esc on screen.
+- **Cancel:** while Granola listens, Esc becomes **Cancel**. Slide off the Voice Typing key onto it to throw the words away instead of pasting them. Any Esc now stops the key showing hands-free.
+- **Keyboard only** at its Fit size gets a shelf under the keys in landscape: Voice Typing and Send on the left, your shortcuts in the middle, and app hotkeys on the right, which used to need the trackpad. Put the keyboard in the middle to keep the old look.
+- The Voice Typing key names the app your words will go into, and stays put when you switch to Granola's tab.
+- Fix: with Rest Fingers on Keys, a slow Return, Tab or Esc no longer gets ignored.
+
 ## 1.2.0
 
 - **Granola:** a hotkey pack with a Voice Typing key that holds Granola's dictation key for you (hold to talk, double-tap for hands-free), in Granola's own colors. It also sits beside the general shortcuts, so you can dictate into any app. If you changed Granola's key from fn, tap **Change** on the Granola tab (or use Settings) and press yours.

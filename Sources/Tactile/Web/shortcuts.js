@@ -1,11 +1,13 @@
-// One-tap Mac shortcuts and app hotkeys. In landscape with the trackpad
-// showing, they're keys on the palm rests either side of the trackpad: general
-// shortcuts on the left, and on the right the hotkeys for one app, picked from
-// a row of app tabs (following the app in front on the Mac). Otherwise the
-// general shortcuts are a bar along the top. Which general shortcuts show,
-// and your own hotkeys, are set in Settings.
+// One-tap Mac shortcuts and app hotkeys. In landscape they're keys on the
+// palm rests below the keyboard (either side of the trackpad, or on a shelf
+// in Keyboard only): Voice Typing with Esc, Delete and Send under it and the
+// general shortcuts on the left (in the middle on the shelf), and on the right
+// the hotkeys for one app, picked from a row of app tabs (following the app in
+// front on the Mac). Otherwise they're a bar along the top. Which general
+// shortcuts show, and your own hotkeys, are set in Settings.
 import { canReverse, glyphOf, hotkeyMessages, isCustomHotkey, reverseMessages, sendInSteps } from './hotkeys.js';
 import { ICONS } from './icons.js';
+import { REPEAT_DELAY, REPEAT_INTERVAL, REPEAT_LIMIT } from './keyboard.js';
 import { iconApps, packForApp, PACKS, TERMINALS } from './packs.js';
 import { el } from './util.js';
 import { createVoiceKey, createVoiceState, DEFAULT_VOICE_KEYS, voiceKeyLabel } from './voice-key.js';
@@ -31,9 +33,11 @@ export const DEFAULT_SHORTCUTS = ['undo', 'redo', 'copy', 'paste', 'switchApp', 
 /** Every app bundle ID whose icon the packs might show (asked of the Mac). */
 export const PACK_ICON_APPS = [...new Set(PACKS.flatMap(iconApps))];
 
-export function createShortcuts({ bar, left, right, tabs, title, add }, { send, feedback, settings, beforeSend, onAddHotkey, onVoiceKey = () => {} }) {
+export function createShortcuts({ bar, left, middle = null, right, tabs, title, add }, { send, feedback, settings, beforeSend, onAddHotkey, onVoiceKey = () => {} }) {
   let labels = {};
-  let besideTrackpad = false;
+  // Where the keys sit: null (the top bar), 'beside' the trackpad, or on the
+  // 'shelf' under the keys in Keyboard only. app.js decides.
+  let palmRests = null;
   let icons = {}; // bundle ID → icon, for apps installed on the Mac
   let frontApp = null; // { id, name }
   // Hotkeys switched on (e.g. a panel opened), so the next tap closes them.
@@ -52,13 +56,23 @@ export function createShortcuts({ bar, left, right, tabs, title, add }, { send, 
     const keys = settings.get('voiceTypingKeys');
     return Array.isArray(keys) && keys.length && keys.every((key) => typeof key === 'string') ? keys : DEFAULT_VOICE_KEYS;
   };
+  const voiceKey = (position, slideToCancel = false) => createVoiceKey(voice, {
+    feedback, keys: voiceKeys, logo: packIcon(granola), target: () => frontApp?.name ?? null, slideToCancel, position,
+  });
 
   const custom = () => (settings.get('customHotkeys') ?? []).filter(isCustomHotkey);
   const general = () => (settings.get('shortcutBar') ? SHORTCUTS.filter(({ id }) => settings.get('shortcuts').includes(id)) : []);
   // Dictation works in any app, so with Granola installed its key also sits
-  // with the general shortcuts (unless Granola's own tab is already showing it).
+  // with the general shortcuts, and stays there whichever app tab is showing.
   const voiceWithGeneral = () => settings.get('voiceTypingLeft') !== false && offeredPacks().includes(granola) &&
-    !isHidden(granola) && !(besideTrackpad && currentPack() === granola);
+    !isHidden(granola);
+  // Any Esc stops Granola listening, so the Voice Typing key stops showing it.
+  const isEscape = (message) => (message.t === 'kd' && message.k === 'Escape') ||
+    (message.t === 'combo' && message.ks.length === 1 && message.ks[0] === 'Escape');
+  const sendHotkey = (message) => {
+    if (isEscape(message)) voice.cancelled();
+    send(message);
+  };
   // Terminal agents are always offered; app packs once their app is found.
   // You can hide any of them in Settings.
   const offeredPacks = () => PACKS.filter((pack) => pack.terminal || pack.apps.some((id) => id in icons));
@@ -109,30 +123,105 @@ export function createShortcuts({ bar, left, right, tabs, title, add }, { send, 
   // sound. `id` tells keys apart, for remembering which are switched on.
   // `pack` is the app pack the key belongs to, if any.
   function button(hotkey, position, id, pack = null) {
-    if (hotkey.voice) return createVoiceKey(voice, { feedback, keys: voiceKeys, logo: packIcon(granola), position });
+    if (hotkey.voice) return voiceKey(position);
     if (hotkey.start) hotkey = { ...hotkey, text: `$ ${pack.command}` };
     const glyph = hotkey.icon
       ? el('span', { className: 'shortcut-glyph shortcut-icon', html: hotkey.icon })
       : el('span', { className: hotkey.text ? 'shortcut-glyph shortcut-text' : 'shortcut-glyph', text: glyphOf(hotkey) });
     const on = switchedOn.has(id);
     const key = el('button', {
-      className: `${besideTrackpad ? 'shortcut' : 'shortcut glass'}${on ? ' on' : ''}${hotkey.wide ? ' wide' : ''}`,
+      className: `${palmRests ? 'shortcut' : 'shortcut glass'}${on ? ' on' : ''}${hotkey.wide ? ' wide' : ''}`,
       attrs: { 'aria-label': hotkey.name, title: hotkey.name, ...(canReverse(hotkey) ? { 'aria-pressed': on } : {}) },
-    }, el('span', { className: 'shortcut-label' }, glyph, el('span', { className: 'shortcut-name', text: hotkey.name })));
+    }, keyFace(glyph, hotkey.name));
     key.addEventListener('click', () => {
       beforeSend();
       if (switchedOn.has(id)) {
         switchedOn.delete(id);
-        sendInSteps(send, reverseMessages(hotkey, labels));
+        sendInSteps(sendHotkey, reverseMessages(hotkey, labels));
       } else {
         if (canReverse(hotkey)) switchedOn.set(id, hotkey);
-        sendInSteps(send, hotkey.start ? startSteps(pack) : hotkeyMessages(hotkey, labels));
+        sendInSteps(sendHotkey, hotkey.start ? startSteps(pack) : hotkeyMessages(hotkey, labels));
       }
       key.classList.toggle('on', switchedOn.has(id));
       if (canReverse(hotkey)) key.setAttribute('aria-pressed', switchedOn.has(id));
-      if (besideTrackpad) feedback.key('key', position);
+      if (palmRests) feedback.key('key', position);
       else feedback.click();
     });
+    return key;
+  }
+
+  // A key's symbol with its name under it (or beside it, on short keys).
+  function keyFace(glyph, name) {
+    return el('span', { className: 'shortcut-label' }, glyph, el('span', { className: 'shortcut-name', text: name }));
+  }
+
+  // The keys of the Send row: one message per tap, with a key sound.
+  function sendRowKey(glyph, name, className = '') {
+    return el('button', { className: `shortcut ${className}`, attrs: { 'aria-label': name, title: name } },
+      keyFace(el('span', { className: 'shortcut-glyph', text: glyph }), name));
+  }
+  function onTap(key, position, message, sendIt = send) {
+    key.addEventListener('click', () => {
+      beforeSend();
+      sendIt(message);
+      feedback.key('key', position);
+    });
+    return key;
+  }
+
+  // Esc, Delete and Send under the Voice Typing key, so dictating and sending
+  // is one movement of one hand. While Granola listens, Esc is Cancel.
+  function sendRow(position) {
+    const escape = sendRowKey('esc', 'Escape');
+    escape.dataset.voiceCancel = '';
+    const showEscape = () => {
+      const cancel = voice.shown() !== 'idle';
+      const words = cancel ? ['✕', 'Cancel'] : ['esc', 'Escape'];
+      escape.querySelector('.shortcut-glyph').textContent = words[0];
+      escape.querySelector('.shortcut-name').textContent = words[1];
+      escape.setAttribute('aria-label', cancel ? 'Cancel Voice Typing' : 'Escape');
+      escape.classList.toggle('cancel', cancel);
+      escape.classList.toggle('armed', Boolean(voice.press?.overCancel));
+    };
+    voice.watchers.add(showEscape);
+    showEscape();
+    onTap(escape, position, { t: 'combo', ks: ['Escape'] }, sendHotkey);
+    return el('div', { className: 'send-row' },
+      escape,
+      repeatingKey(sendRowKey('⌫', 'Delete'), 'Backspace', position),
+      onTap(sendRowKey('⏎', 'Send', 'send'), position, { t: 'combo', ks: ['Enter'] }));
+  }
+
+  // A key that's held down on the Mac for as long as it's touched, repeating
+  // like the keyboard's own (see keyboard.js), so Delete can clear a sentence.
+  function repeatingKey(key, code, position) {
+    let press = null;
+    key.addEventListener('pointerdown', (event) => {
+      if (press) return;
+      try { key.setPointerCapture(event.pointerId); } catch { /* touch already ended */ }
+      beforeSend();
+      send({ t: 'kd', k: code });
+      feedback.key('key', position);
+      const started = performance.now();
+      press = { pointerId: event.pointerId, interval: 0 };
+      press.delay = setTimeout(() => {
+        press.interval = setInterval(() => {
+          if (performance.now() - started > REPEAT_LIMIT) return stop();
+          send({ t: 'kd', k: code, r: true });
+        }, REPEAT_INTERVAL);
+      }, REPEAT_DELAY);
+    });
+    function stop() {
+      if (!press) return;
+      clearTimeout(press.delay);
+      clearInterval(press.interval);
+      press = null;
+      send({ t: 'ku', k: code });
+      feedback.keyUp('key', position);
+    }
+    for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+      key.addEventListener(type, (event) => { if (press?.pointerId === event.pointerId) stop(); });
+    }
     return key;
   }
 
@@ -157,13 +246,30 @@ export function createShortcuts({ bar, left, right, tabs, title, add }, { send, 
   function render() {
     redrawWhenLifted = Boolean(voice.press);
     if (redrawWhenLifted) return;
-    const shown = [...(voiceWithGeneral() ? [VOICE_TYPING] : []), ...general(), ...custom().filter((hotkey) => hotkey.pack === 'all')];
-    bar.replaceChildren(...(besideTrackpad ? [] : shown.map((hotkey) => button(hotkey, 0, hotkey.id))));
-    bar.hidden = besideTrackpad || shown.length === 0;
-    left.replaceChildren(...(besideTrackpad ? shown.map((hotkey) => button(hotkey, -0.9, hotkey.id)) : []));
+    voice.watchers.clear();
+    const withVoice = voiceWithGeneral();
+    const others = [...general(), ...custom().filter((hotkey) => hotkey.pack === 'all')];
+    bar.replaceChildren(...(palmRests ? [] : [...(withVoice ? [VOICE_TYPING] : []), ...others].map((hotkey) => button(hotkey, 0, hotkey.id))));
+    bar.hidden = Boolean(palmRests) || bar.childElementCount === 0;
+    // On the palm rests: Voice Typing, then Esc, Delete and Send, then the
+    // general shortcuts. Trackpad only has no keyboard, so it always gets the
+    // Send row; Keyboard only's shelf moves the general shortcuts to the middle.
+    const layout = settings.get('layout');
+    const shelf = palmRests === 'shelf';
+    const sending = withVoice || layout === 'trackpad' || shelf;
+    left.replaceChildren(...(palmRests ? [
+      ...(withVoice ? [voiceKey(-0.9, sending)] : []),
+      ...(sending ? [sendRow(-0.9)] : []),
+      ...(shelf ? [] : others.map((hotkey) => button(hotkey, -0.9, hotkey.id))),
+    ] : []));
+    middle?.replaceChildren(...(shelf ? others.map((hotkey) => button(hotkey, 0, hotkey.id)) : []));
+    // Under the keyboard (Both) there's room for about five rows: with Voice
+    // Typing and the Send row taking two, that's six shortcuts two to a row.
+    // More go three to a row, so no key gets too short to read.
+    left.classList.toggle('three-up', palmRests === 'beside' && layout === 'both' && others.length > (withVoice ? 6 : 10));
 
     const pack = currentPack();
-    if (!besideTrackpad || !pack) {
+    if (!palmRests || !pack) {
       right.replaceChildren();
       tabs.replaceChildren();
       title.replaceChildren();
@@ -188,21 +294,24 @@ export function createShortcuts({ bar, left, right, tabs, title, add }, { send, 
       change.addEventListener('click', onVoiceKey);
       title.append(change);
     }
-    const hotkeys = pack.hotkeys.concat(custom().filter((hotkey) => hotkey.pack === pack.id));
+    // Granola's tab leaves out Voice Typing while it's on the left already.
+    const hotkeys = pack.hotkeys.filter((hotkey) => !(hotkey.voice && withVoice))
+      .concat(custom().filter((hotkey) => hotkey.pack === pack.id));
     right.replaceChildren(...hotkeys.map((hotkey, index) => button(hotkey, 0.9, hotkey.id ?? `${pack.id}:${index}`, pack)));
   }
 
   add.addEventListener('click', () => onAddHotkey(currentPack()?.id ?? 'all'));
   settings.subscribe((key) => {
-    if (['shortcuts', 'shortcutBar', 'customHotkeys', 'pack', 'hiddenPacks', 'voiceTypingKeys', 'voiceTypingLeft'].includes(key)) render();
+    if (['layout', 'shortcuts', 'shortcutBar', 'customHotkeys', 'pack', 'hiddenPacks', 'voiceTypingKeys', 'voiceTypingLeft'].includes(key)) render();
   });
   render();
 
   return {
     /** Lets go of a held Voice Typing key, e.g. when the iPad looks away. */
     releaseVoice: () => voice.release(),
-    /** You typed or clicked: palettes opened by a hotkey have closed. */
-    noteInput() {
+    /** You typed or clicked: palettes opened by a hotkey have closed, and Esc stops Granola listening. */
+    noteInput(message) {
+      if (message && isEscape(message)) voice.cancelled();
       let changed = false;
       for (const [id, hotkey] of switchedOn) {
         if (hotkey.transient) changed = switchedOn.delete(id) || changed;
@@ -211,10 +320,10 @@ export function createShortcuts({ bar, left, right, tabs, title, add }, { send, 
     },
     /** The Mac's keyboard layout changed; letter shortcuts follow it (keys.js `codeForCharacter`). */
     setLabels: (next) => { labels = next; },
-    /** Moves the shortcuts beside the trackpad, or back to the top bar. */
-    placeBesideTrackpad(on) {
-      if (on === besideTrackpad) return;
-      besideTrackpad = on;
+    /** Moves the shortcuts to the palm rests ('beside' the trackpad, or the 'shelf' in Keyboard only), or back to the top bar (null). */
+    placeOnPalmRests(place) {
+      if (place === palmRests) return;
+      palmRests = place;
       render();
     },
     /** Icons of the apps installed on the Mac, by bundle ID. */

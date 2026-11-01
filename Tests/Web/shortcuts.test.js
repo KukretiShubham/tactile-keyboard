@@ -70,7 +70,7 @@ function setup(overrides = {}) {
 test('beside the trackpad: general shortcuts left, the chosen app right', () => {
   const { bar, left, right, tabs, names, shortcuts } = setup();
   expectEqual(names(bar), ['Undo', 'Copy', 'Spotlight'], 'top bar');
-  shortcuts.placeBesideTrackpad(true);
+  shortcuts.placeOnPalmRests('beside');
   expectEqual(names(bar), [], 'top bar beside the trackpad');
   expectEqual(names(left), ['Undo', 'Copy', 'Spotlight'], 'left side');
   expectEqual(names(right), ['Start', 'Stop', 'Rewind', 'Switch Mode', 'Search History', 'Background', 'Clear', 'Compact'], 'right side');
@@ -81,7 +81,7 @@ test('beside the trackpad: general shortcuts left, the chosen app right', () => 
 
 test('the app in front on the Mac picks its hotkeys', () => {
   const { right, tabs, title, settings, shortcuts } = setup();
-  shortcuts.placeBesideTrackpad(true);
+  shortcuts.placeOnPalmRests('beside');
   shortcuts.setIcons({ 'com.microsoft.VSCode': 'data:image/png;base64,AA==' });
   shortcuts.setFrontApp({ id: 'com.microsoft.VSCode', name: 'Code' });
   expectEqual(right.firstChild.getAttribute('aria-label'), 'Quick Open', 'VS Code hotkeys');
@@ -100,7 +100,7 @@ test('the app in front on the Mac picks its hotkeys', () => {
 
 test('your hotkeys appear with their app, or with the general ones', async () => {
   const { left, right, sent, names, shortcuts, settings } = setup();
-  shortcuts.placeBesideTrackpad(true);
+  shortcuts.placeOnPalmRests('beside');
   settings.set('customHotkeys', [
     { id: 'mine-1', name: 'Review', pack: 'claude', text: '/review', enter: true },
     { id: 'mine-2', name: 'Rerun', pack: 'all', keys: ['MetaLeft', 'ShiftLeft', 'KeyR'] },
@@ -116,7 +116,7 @@ test('your hotkeys appear with their app, or with the general ones', async () =>
 
 test('tapping a tab brings its app to the front on the Mac', () => {
   const { tabs, sent, settings, shortcuts } = setup();
-  shortcuts.placeBesideTrackpad(true);
+  shortcuts.placeOnPalmRests('beside');
   shortcuts.setIcons({ 'com.microsoft.VSCode': 'data:image/png;base64,AA==' });
   tabs.querySelector('[data-pack="vscode"]').click();
   expectEqual(sent.at(-1), { t: 'focus', k: 'com.microsoft.VSCode' }, 'VS Code tab');
@@ -131,7 +131,7 @@ test('tapping a tab brings its app to the front on the Mac', () => {
 
 test('agents come back where you used them last: desktop app or terminal', () => {
   const { tabs, title, sent, settings, shortcuts } = setup();
-  shortcuts.placeBesideTrackpad(true);
+  shortcuts.placeOnPalmRests('beside');
 
   // Using the Claude desktop app picks Claude Code and remembers it.
   shortcuts.setFrontApp({ id: 'com.anthropic.claudefordesktop', name: 'Claude' });
@@ -153,7 +153,7 @@ test('agents come back where you used them last: desktop app or terminal', () =>
 
 test('a second tap closes what the first opened', () => {
   const { right, sent, settings, shortcuts } = setup();
-  shortcuts.placeBesideTrackpad(true);
+  shortcuts.placeOnPalmRests('beside');
   shortcuts.setIcons({ 'dev.zed.Zed': 'data:image/png;base64,AA==' });
   shortcuts.setFrontApp({ id: 'dev.zed.Zed', name: 'Zed' });
   const key = (name) => right.querySelector(`[aria-label="${name}"]`);
@@ -187,7 +187,7 @@ test('a second tap closes what the first opened', () => {
 
 test('an agent never used yet opens in its desktop app if installed', () => {
   const { tabs, sent, shortcuts } = setup();
-  shortcuts.placeBesideTrackpad(true);
+  shortcuts.placeOnPalmRests('beside');
   shortcuts.setIcons({ 'com.openai.codex': 'data:image/png;base64,AA==' });
   tabs.querySelector('[data-pack="codex"]').click();
   expectEqual(sent.at(-1), { t: 'focus', k: 'com.openai.codex' }, 'Codex app');
@@ -197,7 +197,7 @@ test('an agent never used yet opens in its desktop app if installed', () => {
 
 test('Start runs the agent in a new terminal window', async () => {
   const { right, sent, settings, shortcuts } = setup();
-  shortcuts.placeBesideTrackpad(true);
+  shortcuts.placeOnPalmRests('beside');
   settings.set('pack', 'codex');
   shortcuts.setFrontApp({ id: 'com.googlecode.iterm2', name: 'iTerm2' });
   sent.length = 0;
@@ -214,7 +214,7 @@ test('Start runs the agent in a new terminal window', async () => {
 
 test('apps you hide get no tab, even in front on the Mac', () => {
   const { tabs, names, settings, shortcuts } = setup();
-  shortcuts.placeBesideTrackpad(true);
+  shortcuts.placeOnPalmRests('beside');
   shortcuts.setIcons({ 'com.microsoft.VSCode': 'data:image/png;base64,AA==', 'dev.zed.Zed': 'data:image/png;base64,AA==' });
   settings.set('hiddenPacks', ['vscode']);
   expectEqual(names(tabs), ['Claude Code', 'Codex', 'Zed'], 'tabs');

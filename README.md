@@ -29,7 +29,7 @@ Put your Mac on a stand, keep the iPad in front of you, and type and point with 
 - **A proper trackpad.** Tap to click, two-finger click, two-finger scroll with momentum, pinch to zoom, drag, three-finger drag, and swipes for Spaces, Mission Control and App Exposé.
 - **Laid out like a MacBook.** In landscape the trackpad sits centred below the keyboard, and the palm rests either side hold big shortcut keys: Undo, Redo, Copy, Paste, Switch App, Spotlight and more. You pick which.
 - **Hotkeys for the apps you work in.** Ready-made keys for Claude Code, Codex, Granola, VS Code, Zed, Xcode, JetBrains IDEs and browsers, shown with each app's own icon. They switch to whichever app you're using on the Mac, and you can record your own.
-- **Talk instead of type.** With Granola installed, a Voice Typing key holds Granola's dictation key for you: hold to talk, double-tap for hands-free, in any app.
+- **Talk instead of type.** With Granola installed, a Voice Typing key holds Granola's dictation key for you: hold to talk, double-tap for hands-free, in any app. Send and Cancel sit right under it.
 - **Private and secure.** Everything stays between your iPad and your Mac, encrypted with TLS. Pairing takes a one-time code, and over Tailscale only your own devices can connect.
 - **Nothing to patch.** No third-party packages on either side: Apple frameworks on the Mac, plain HTML, CSS and JavaScript on the iPad.
 
@@ -166,15 +166,15 @@ Tap the settings button (top right):
 
 - **Keyboard skin:** Midnight Glow (eight glow colors), Space Black, Silver, Frosted Glass, or Automatic.
 - **Keyboard:** Key Height, Function Row, Rest Fingers on Keys, Key Popups, **Adapt to My Typing** (with Reset Typing Learning), and **Match Mac Layout**.
-- **Shortcuts:** turn them on or off and choose which appear. In landscape with the trackpad they're keys on the left of the trackpad; otherwise they sit along the top. Letter shortcuts follow your Mac's layout, so ⌘Z is still ⌘Z on AZERTY.
+- **Shortcuts:** turn them on or off and choose which appear. In landscape they're keys below the keyboard (left of the trackpad, or in the middle of the Keyboard-only shelf); otherwise they sit along the top. Letter shortcuts follow your Mac's layout, so ⌘Z is still ⌘Z on AZERTY.
 - **App Hotkeys:** **Follow My Mac's App** switches the hotkeys beside the trackpad to the app in front on the Mac. **Apps** has a switch per app, to hide the tabs you don't use. **My Hotkeys** lists the hotkeys you made, to delete them.
 - **Feedback:** key sounds, Soft, Crisp or Thock, volume, Sound in Silent Mode, and vibration on devices that have it.
 - **Trackpad:** tracking speed, scrolling speed, natural scrolling, Pinch to Zoom, Three-Finger Drag.
-- **Layout:** keyboard, trackpad or both (in landscape, both gives the MacBook-style layout with the trackpad centred, and trackpad-only keeps the shortcut keys on either side); keyboard at the top, middle or bottom; **Expanded** or **Floating** keyboard; **Keep Screen Awake** (the iPad stays on while you use it, and sleeps normally after 10 idle minutes).
+- **Layout:** keyboard, trackpad or both (in landscape, both gives the MacBook-style layout with the trackpad centred, trackpad-only keeps the shortcut keys on either side, and keyboard-only at its Fit size adds a shelf of shortcut keys under the keys); keyboard at the top, middle or bottom; **Expanded** or **Floating** keyboard; **Keep Screen Awake** (the iPad stays on while you use it, and sleeps normally after 10 idle minutes).
 
 ### App hotkeys
 
-In landscape with the trackpad showing, the right side of the trackpad has a row of app tabs, each with that app's hotkeys: Claude Code, Codex, Granola (with a hold-to-talk Voice Typing key), VS Code, Zed, Xcode, JetBrains IDEs and browsers. They follow the app in front on your Mac, tapping a tab brings that app forward, and a second tap closes what a hotkey opened. Tap **+** to record your own. The full list and how each one behaves is in [docs/app-hotkeys.md](docs/app-hotkeys.md).
+In landscape (beside the trackpad, or on the Keyboard-only shelf), the right side has a row of app tabs, each with that app's hotkeys: Claude Code, Codex, Granola (with a hold-to-talk Voice Typing key), VS Code, Zed, Xcode, JetBrains IDEs and browsers. They follow the app in front on your Mac, tapping a tab brings that app forward, and a second tap closes what a hotkey opened. Tap **+** to record your own. The full list and how each one behaves is in [docs/app-hotkeys.md](docs/app-hotkeys.md).
 
 ### The menu bar
 

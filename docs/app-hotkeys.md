@@ -24,9 +24,11 @@ The **Voice Typing** key holds Granola's dictation key down on your Mac for as l
 
 - **Hold** to talk; let go and Granola pastes your words where you're typing.
 - **Double-tap** for hands-free; tap again to stop. Esc (Cancel Dictation) throws the dictation away.
+- **Send** sits right under the key, beside Esc and Delete, so you can read back what Granola typed, fix a word and send it without reaching for the keyboard. Delete repeats while you hold it.
+- While Granola listens, Esc becomes **Cancel**. Slide your finger off the Voice Typing key onto Cancel to throw the words away; letting go anywhere else pastes them. The key shows which app the words will go into.
 - The key turns into Granola's listening pill while it's on. Tactile can't see inside Granola, so it follows your taps the way Granola does.
 - **Your key:** Granola listens for fn unless you changed it in Granola's Settings → Voice typing. If you did, set the same key in Tactile under Settings → Voice Typing Key.
-- Dictation works in any app, so with Granola installed the key also sits beside the general shortcuts (switch that off under **Show with Shortcuts**).
+- Dictation works in any app, so with Granola installed the key also sits beside the general shortcuts, and stays there when Granola's tab is showing (switch that off under **Show with Shortcuts** to have it only on Granola's tab).
 
 New Note (⇧⌘N) and Cancel are from Granola's menu and docs; Quick Chat (⌥Space) is a shortcut Granola's app registers, and may need Quick Chat switched on in Granola.
 - Text hotkeys like `/clear` type the command and press Return.

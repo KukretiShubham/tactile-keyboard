@@ -5,15 +5,20 @@ import { applyLabels, buildKeys, characterOf, FN_LAYER, soundKind } from './keys
 import { pickKey } from './typing-model.js';
 import { clamp, el } from './util.js';
 
-const NO_REPEAT = new Set(['Escape', 'Enter', 'Tab']);
-const REPEAT_DELAY = 450;
-const REPEAT_INTERVAL = 55;
+// Return, Tab and Esc are pressed once and on purpose: they never repeat, and
+// they're often pressed slowly (say, after reading back a dictated message).
+const DELIBERATE = new Set(['Escape', 'Enter', 'Tab']);
+export const REPEAT_DELAY = 450;
+export const REPEAT_INTERVAL = 55;
 // A held key never repeats longer than this, even if its finger-lift is lost.
-const REPEAT_LIMIT = 10000;
+export const REPEAT_LIMIT = 10000;
 const DOUBLE_TAP = 350;
 // With "Rest Fingers on Keys", a touch held longer than this is a resting
-// finger, not a keystroke.
+// finger, not a keystroke. Fingers don't rest on the deliberate keys, so they
+// get longer.
 const REST_TIME = 350;
+const DELIBERATE_REST_TIME = 1500;
+const restTimeOf = (def) => (DELIBERATE.has(def.code) ? DELIBERATE_REST_TIME : REST_TIME);
 // A key deleted this soon after it was typed was probably a miss, so typing
 // learning forgets that touch.
 const UNDO_WINDOW = 1200;
@@ -106,7 +111,7 @@ export function createKeyboard(root, { send, feedback, settings, model = null })
     send({ t: 'kd', k: code });
 
     const press = { code, addShift, stopRepeat() {} };
-    if (repeat && !NO_REPEAT.has(code) && def.kind !== 'fkey') {
+    if (repeat && !DELIBERATE.has(code) && def.kind !== 'fkey') {
       // Repeats only while this exact press is still held (see `isHeld`), and
       // never for longer than REPEAT_LIMIT, so a lost finger-lift can't leave a
       // key repeating forever.
@@ -260,7 +265,7 @@ export function createKeyboard(root, { send, feedback, settings, model = null })
     if (press.sound) feedback.keyUp(press.sound.kind, press.sound.position);
     if (press.deferred) {
       const now = performance.now();
-      if (!press.committed && event.type === 'pointerup' && now - press.at < REST_TIME) {
+      if (!press.committed && event.type === 'pointerup' && now - press.at < restTimeOf(press.def)) {
         commitEarlier(press, now);
         commit(press);
       }
