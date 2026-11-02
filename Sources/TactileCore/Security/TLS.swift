@@ -112,7 +112,7 @@ public struct LocalAuthority {
         authorityKeyIdentifier = keyid
         """.write(to: ext, atomically: true, encoding: .utf8)
 
-        try OpenSSL.run(["ecparam", "-name", "prime256v1", "-genkey", "-noout", "-out", key.path])
+        try generateServerKey(at: key)
         // Browsers check the names listed above, not the common name; a fixed
         // one keeps within OpenSSL's 64-character limit for any host name.
         try OpenSSL.run(["req", "-new", "-key", key.path, "-subj", "/CN=Tactile", "-out", csr.path])
@@ -165,6 +165,21 @@ public struct LocalAuthority {
         try OpenSSL.run(["req", "-x509", "-new", "-key", key.path, "-sha256", "-days", "3650",
                          "-config", config.path, "-out", cert.path])
         Log.info("Created a new certificate authority for this Mac.")
+    }
+
+    /// A new P-256 key for the HTTPS certificate. LibreSSL writes the private
+    /// value without its leading zero bytes (about one key in 256), and
+    /// `SecPKCS12Import` then succeeds but returns no identity, so such a key
+    /// is drawn again. Only this key is imported; the CA's is only used by OpenSSL.
+    private static func generateServerKey(at key: URL) throws {
+        for _ in 0..<8 {
+            try OpenSSL.run(["ecparam", "-name", "prime256v1", "-genkey", "-noout", "-out", key.path])
+            // SEC1 DER: SEQUENCE { INTEGER 1, OCTET STRING privateKey, ... };
+            // byte 6 is the private value's length.
+            let der = try OpenSSL.derFromPEM(Data(contentsOf: key))
+            if der.count > 6, der[6] == 32 { return }
+        }
+        throw TLSIdentity.Failure.openssl("couldn't generate a full-length key")
     }
 
     /// Whether the CA may vouch for `address` (an IPv4 address in a private range).
