@@ -2,6 +2,7 @@ import { ICONS } from './icons.js';
 import { glyphOf, isCustomHotkey } from './hotkeys.js';
 import { DEFAULT_VOICE_KEYS, voiceKeyLabel } from './voice-key.js';
 import { SHORTCUTS } from './shortcuts.js';
+import { AGENTS } from './touchbar.js';
 import { closeSheet, el, openSheet } from './util.js';
 
 export const SKINS = [
@@ -192,6 +193,18 @@ export function setupSheets({ connection, feedback, settings, typingModel, onNew
     document.getElementById('sizeRow').hidden = layout !== 'keyboard';
     document.getElementById('sizeNote').hidden = layout !== 'keyboard';
     settingsSheet.querySelector('[data-setting="keyboardPosition"] [data-value="middle"]').hidden = layout !== 'keyboard';
+    syncTouchBar();
+  }
+
+  // Touch Bar options appear once it's chosen, for the agents on the Mac.
+  let agentApps = [];
+  function syncTouchBar() {
+    document.getElementById('touchBarSettings').hidden = settings.get('functionRow') !== 'touchbar';
+    document.getElementById('agentRows').hidden = !agentApps.length;
+    settingsSheet.querySelectorAll('#agentRows [data-agent]').forEach((row) => { row.hidden = !agentApps.includes(row.dataset.agent); });
+    document.getElementById('agentNote').textContent = agentApps.length
+      ? "The Touch Bar shows how much of your plan you've used and the tasks Claude and Codex are working on. Tap a task to see its steps. Hold fn for F1–F12."
+      : 'The Touch Bar has esc and your Mac’s controls. With Claude or Codex on your Mac, it also shows what they’re working on. Hold fn for F1–F12.';
   }
   settings.subscribe(sync);
   sync();
@@ -224,5 +237,19 @@ export function setupSheets({ connection, feedback, settings, typingModel, onNew
     });
   }
 
-  return { sync };
+  return {
+    sync,
+    setAgentApps(apps) {
+      agentApps = apps;
+      syncTouchBar();
+    },
+    setAgentIcons(icons) {
+      for (const row of settingsSheet.querySelectorAll('#agentRows [data-agent]')) {
+        const img = row.querySelector('img');
+        const id = AGENTS.find((agent) => agent.id === row.dataset.agent).icon;
+        if (icons[id]) img.src = icons[id];
+        img.hidden = !icons[id];
+      }
+    },
+  };
 }

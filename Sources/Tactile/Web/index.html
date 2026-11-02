@@ -98,7 +98,12 @@
               <button data-value="standard">Standard</button><button data-value="tall">Tall</button>
             </div>
           </div>
-          <label class="row"><span class="row-label">Function Row</span><input type="checkbox" class="switch" data-setting="functionRow"></label>
+          <div class="row">
+            <span class="row-label">Function Row</span>
+            <div class="segmented" data-setting="functionRow">
+              <button data-value="touchbar">Touch Bar</button><button data-value="keys">Keys</button><button data-value="off">Off</button>
+            </div>
+          </div>
           <label class="row"><span class="row-label">Rest Fingers on Keys</span><input type="checkbox" class="switch" data-setting="restFingers"></label>
           <label class="row"><span class="row-label">Key Popups</span><input type="checkbox" class="switch" data-setting="keyPopups"></label>
           <label class="row"><span class="row-label">Adapt to My Typing</span><input type="checkbox" class="switch" data-setting="adaptiveTyping"></label>
@@ -107,6 +112,16 @@
         </div>
         <p class="group-footer">With Rest Fingers on, keys type when you lift your finger, so fingers resting on the keys don't type. Delete and the arrow keys still repeat when held.</p>
         <p class="group-footer">Adapt to My Typing learns where you press each key and moves its touch area to match, on this iPad only. Match Mac Layout labels the keys for the keyboard layout your Mac uses, such as AZERTY.</p>
+
+        <div id="touchBarSettings">
+          <h3 class="group-title">Touch Bar</h3>
+          <div class="group" id="agentRows">
+            <label class="row" data-agent="claude"><span class="row-label agent-label"><img alt="">Claude</span><input type="checkbox" class="switch" data-setting="agentClaude"></label>
+            <label class="row" data-agent="codex"><span class="row-label agent-label"><img alt="">Codex</span><input type="checkbox" class="switch" data-setting="agentCodex"></label>
+            <label class="row"><span class="row-label">Show Plan Usage</span><input type="checkbox" class="switch" data-setting="agentUsage"></label>
+          </div>
+          <p class="group-footer" id="agentNote"></p>
+        </div>
 
         <h3 class="group-title">Shortcuts</h3>
         <div class="group">

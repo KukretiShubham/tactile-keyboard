@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/silver.jpg" alt="Tactile on an iPad in landscape in the Silver skin: a white Mac keyboard with a key popup, and below it a centred trackpad with shortcut keys on the left and Zed's hotkeys on the right, under a row of app tabs" width="900">
+  <img src="docs/images/silver.jpg" alt="Tactile on an iPad in landscape in the Silver skin: a white Mac keyboard with a key popup, topped by a black Touch Bar showing Claude's and Codex's tasks and plan usage, and below it a centred trackpad with shortcut keys on the left and Zed's hotkeys on the right, under a row of app tabs" width="900">
 </p>
 
 Put your Mac on a stand, keep the iPad in front of you, and type and point with it like a laptop. Tactile is a tiny menu bar app for the Mac and a web page for the iPad. Scan a QR code and you're typing; there's nothing to install from the App Store.
@@ -29,6 +29,7 @@ Put your Mac on a stand, keep the iPad in front of you, and type and point with 
 - **A proper trackpad.** Tap to click, two-finger click, two-finger scroll with momentum, pinch to zoom, drag, three-finger drag, and swipes for Spaces, Mission Control and App Exposé.
 - **Laid out like a MacBook.** In landscape the trackpad sits centred below the keyboard, and the palm rests either side hold big shortcut keys: Undo, Redo, Copy, Paste, Switch App, Spotlight and more. You pick which.
 - **Hotkeys for the apps you work in.** Ready-made keys for Claude Code, Codex, Granola, VS Code, Zed, Xcode, JetBrains IDEs and browsers, shown with each app's own icon. They switch to whichever app you're using on the Mac, and you can record your own.
+- **Watch your coding agents.** A MacBook-style **Touch Bar** above the keys shows what Claude and Codex are doing on your Mac: how much of your plan you've used, which tasks are working, done or waiting for you, and each task's steps a tap away.
 - **Talk instead of type.** With Granola installed, a Voice Typing key holds Granola's dictation key for you: hold to talk, double-tap for hands-free, in any app. Send and Cancel sit right under it.
 - **Private and secure.** Everything stays between your iPad and your Mac, encrypted with TLS. Pairing takes a one-time code, and over Tailscale only your own devices can connect.
 - **Nothing to patch.** No third-party packages on either side: Apple frameworks on the Mac, plain HTML, CSS and JavaScript on the iPad.
@@ -39,8 +40,8 @@ Put your Mac on a stand, keep the iPad in front of you, and type and point with 
 |---|---|
 | ![Midnight Glow skin: dark keys with glowing blue edges, with Claude Code's hotkeys beside the trackpad](docs/images/midnight.jpg) | ![Frosted Glass skin: translucent keys over a colorful background, keyboard only](docs/images/frosted.jpg) |
 | **Midnight Glow**, with Claude Code's hotkeys | **Frosted Glass**, keyboard only and expanded |
-| ![Floating keyboard in Space Black, smaller and centered with a drag handle](docs/images/floating.jpg) | ![Settings sheet with keyboard skins and glow colors](docs/images/settings.jpg) |
-| **Floating** keyboard: drag the handle to move it, the corner to resize it | **Settings**: skins, glow colors, sounds, trackpad and layout |
+| ![Floating keyboard in Space Black, smaller and centered with a drag handle](docs/images/floating.jpg) | ![Settings sheet with keyboard skins, glow colors and Function Row set to Touch Bar](docs/images/settings.jpg) |
+| **Floating** keyboard: drag the handle to move it, the corner to resize it | **Settings**: skins, glow colors, the Touch Bar, sounds, trackpad and layout |
 
 Make your own hotkeys: record a key combination right on the keyboard, or send text like `/review`:
 
@@ -165,12 +166,24 @@ A hardware keyboard attached to the iPad is passed through to the Mac too.
 Tap the settings button (top right):
 
 - **Keyboard skin:** Midnight Glow (eight glow colors), Space Black, Silver, Frosted Glass, or Automatic.
-- **Keyboard:** Key Height, Function Row, Rest Fingers on Keys, Key Popups, **Adapt to My Typing** (with Reset Typing Learning), and **Match Mac Layout**.
+- **Keyboard:** Key Height, Function Row (**Touch Bar**, **Keys** for F1–F12, or **Off**), Rest Fingers on Keys, Key Popups, **Adapt to My Typing** (with Reset Typing Learning), and **Match Mac Layout**.
 - **Shortcuts:** turn them on or off and choose which appear. In landscape they're keys below the keyboard (left of the trackpad, or in the middle of the Keyboard-only shelf); otherwise they sit along the top. Letter shortcuts follow your Mac's layout, so ⌘Z is still ⌘Z on AZERTY.
 - **App Hotkeys:** **Follow My Mac's App** switches the hotkeys beside the trackpad to the app in front on the Mac. **Apps** has a switch per app, to hide the tabs you don't use. **My Hotkeys** lists the hotkeys you made, to delete them.
 - **Feedback:** key sounds, Soft, Crisp or Thock, volume, Sound in Silent Mode, and vibration on devices that have it.
 - **Trackpad:** tracking speed, scrolling speed, natural scrolling, Pinch to Zoom, Three-Finger Drag.
 - **Layout:** keyboard, trackpad or both (in landscape, both gives the MacBook-style layout with the trackpad centred, trackpad-only keeps the shortcut keys on either side, and keyboard-only at its Fit size adds a shelf of shortcut keys under the keys); keyboard at the top, middle or bottom; **Expanded** or **Floating** keyboard; **Keep Screen Awake** (the iPad stays on while you use it, and sleeps normally after 10 idle minutes).
+
+### Touch Bar
+
+A strip like a MacBook's sits in place of F1–F12, at the top of the keyboard (or across the top in Trackpad only). Hold fn for F1–F12, or set Function Row to **Keys** to keep them showing.
+
+<p align="center"><img src="docs/images/touchbar.jpg" alt="The Touch Bar showing Claude's tasks as chips, one waiting for approval, with a card open under one task: its four steps with the second in progress, what Claude is doing now, and an Open in Claude button" width="700"></p>
+
+- **esc** on the left and the **Control Strip** on the right: ‹ opens every control (brightness, Mission Control, Spotlight, media, volume, lock).
+- **Claude** and **Codex** in between, each with how much of your plan you've used (subscriptions only; Codex shows it when signed in with ChatGPT) and how many tasks are **working**, **need you** or are **done**.
+- Tap one to see its tasks by title. Tap a task for its steps, what it's doing now or what it's waiting for you to allow, and **Open in Claude**, which opens that chat in the Claude app (**Open in Codex** brings Codex forward). Tap the plan usage for every limit and when it resets.
+
+Tactile reads this from Claude's and Codex's own files on your Mac, and asks Claude Code for plan usage every few minutes (it starts Claude Code without a prompt, so nothing is sent as a chat and nothing counts against your plan). Choose which agents, and whether to show plan usage, under Settings → Touch Bar. Nothing is read unless the Touch Bar is showing. [docs/touch-bar.md](docs/touch-bar.md) explains which files it reads and how to add another agent.
 
 ### App hotkeys
 
@@ -195,7 +208,7 @@ Tactile can type on your Mac, so it's built to be careful:
 - **Paired, not open:** a new device needs a six-digit code that works once, and only ever travels over HTTPS. Wrong guesses lock out quickly. Remembered devices hold a random 256-bit token that the Mac stores only as a hash, and expire after 90 days unused.
 - **Only your devices on Tailscale:** Tactile asks Tailscale who owns each device and refuses anything not signed in as you, before it can even try to pair.
 - **A limited certificate:** the local certificate authority can only vouch for `.local` names and private addresses, so it can't be used to impersonate websites.
-- **Nothing leaves your network:** no accounts, no analytics, no cloud service. What Adapt to My Typing learns stays on the iPad. Your paired iPad is told the name of the app in front on the Mac, for app hotkeys.
+- **Nothing leaves your network:** no accounts, no analytics, no cloud service. What Adapt to My Typing learns stays on the iPad. Your paired iPad is told the name of the app in front on the Mac, for app hotkeys, and, with the Touch Bar on, the titles and steps of Claude's and Codex's recent tasks and your plan usage.
 
 Found a security problem? Please report it privately, as described in [SECURITY.md](SECURITY.md).
 

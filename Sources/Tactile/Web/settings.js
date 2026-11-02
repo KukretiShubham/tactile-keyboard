@@ -21,7 +21,8 @@ const DEFAULTS = {
   threeFingerDrag: false,
   layout: 'both',
   keyHeight: 'standard',
-  functionRow: true,
+  // 'touchbar', 'keys' (F1–F12) or 'off'.
+  functionRow: 'touchbar',
   keyboardPosition: 'top',
   keyboardSize: 'fit',
   floatingFrame: null,
@@ -41,12 +42,24 @@ const DEFAULTS = {
   followMacApp: true,
   customHotkeys: [],
   keepAwake: true,
+  // What the Touch Bar shows.
+  agentClaude: true,
+  agentCodex: true,
+  agentUsage: true,
 };
 
 
+/** Saved settings from older versions, in today's form. */
+export function upgrade(saved) {
+  // The function row used to be on or off; on becomes the Touch Bar, which
+  // still has F1–F12 under fn.
+  if (typeof saved.functionRow === 'boolean') saved.functionRow = saved.functionRow ? 'touchbar' : 'off';
+  return saved;
+}
+
 function load() {
   try {
-    return { ...DEFAULTS, ...JSON.parse(storage.get(KEY) || '{}') };
+    return { ...DEFAULTS, ...upgrade(JSON.parse(storage.get(KEY) || '{}')) };
   } catch {
     return { ...DEFAULTS };
   }

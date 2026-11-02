@@ -68,6 +68,7 @@ public final class TactileService {
     private var lastActive: [String: Date] = [:]
     private var keyboardLabels: [String: [String]] = [:]
     private var frontApp: (id: String, name: String)?
+    private let agents = AgentMonitor()
 
     /// Icons of installed apps by bundle ID, as PNG data URLs (see
     /// `SocketServer.appIcons`). Set by the app, which can read them.
@@ -75,6 +76,9 @@ public final class TactileService {
     /// Brings the app with this bundle ID to the front, preferring its window
     /// whose title includes the hint. Set by the app.
     public var focusApp: (String, String?) -> Void = { _, _ in }
+    /// Opens a link on the Mac, such as one chat in the Claude app. Set by the
+    /// app; only ever given links Tactile made (see `AgentMonitor.open`).
+    public var openURL: (URL) -> Void = { _ in }
 
     private var stateObservers: [(Snapshot) -> Void] = []
     private var eventObservers: [(Event) -> Void] = []
@@ -92,6 +96,9 @@ public final class TactileService {
         self.onlyMyDevices = onlyMyDevices
         pairing.onNewCode = { [weak self] in self?.publish() }
         pairing.onDevicesChanged = { [weak self] in self?.publish() }
+        agents.onUpdate = { [weak self] message in
+            self?.queue.async { self?.sockets.forEach { $0.sendAgents(message) } }
+        }
     }
 
     // MARK: Observing (callbacks arrive on the main queue)
@@ -232,6 +239,20 @@ public final class TactileService {
         frontApp.map { ["t": "app", "id": $0.id, "name": $0.name] }
     }
 
+    /// Which agents are on this Mac, so the iPad offers only those.
+    private var agentAppsMessage: [String: Any] { ["t": "agentApps", "apps": AgentMonitor.installed()] }
+
+    /// Watches the agents while any device's Touch Bar shows them.
+    private func agentInterestChanged() {
+        agents.watch(sockets.map(\.agentInterest).reduce(AgentInterest()) { $0.union($1) })
+    }
+
+    /// Opens a task a device's Touch Bar showed (see `AgentMonitor.open`).
+    private func openTask(_ id: String) {
+        let focusApp = focusApp
+        agents.open(id, link: openURL, app: { focusApp($0, nil) })
+    }
+
     public func setUseTailscale(_ value: Bool) {
         queue.async {
             self.useTailscale = value
@@ -315,6 +336,7 @@ public final class TactileService {
         pages.forEach { $0.stop() }
         sockets = []
         pages = []
+        agents.watch(AgentInterest())
         running = false
         paused = false
         held = []
@@ -362,8 +384,12 @@ public final class TactileService {
         socket.isHeld = { [weak self] id in self?.held.contains(id) ?? false }
         socket.onInput = { [weak self] id in self?.inputArrived(from: id) }
         socket.gate = gate
-        socket.welcomeMessages = { [weak self] in [self?.layoutMessage, self?.frontAppMessage].compactMap { $0 } }
+        socket.welcomeMessages = { [weak self] in
+            [self?.layoutMessage, self?.frontAppMessage, self?.agentAppsMessage].compactMap { $0 }
+        }
+        socket.onAgentInterest = { [weak self] in self?.agentInterestChanged() }
         socket.onFocusApp = { [weak self] id, hint in self?.focusApp(id, hint) }
+        socket.onOpenTask = { [weak self] id in self?.openTask(id) }
         socket.appIcons = { [weak self] ids, done in
             guard let self else { return done([:]) }
             self.appIcons(ids, done)

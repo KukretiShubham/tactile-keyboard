@@ -13,6 +13,8 @@ public final class SocketServer {
         var authTimeout: DispatchWorkItem?
         /// Who Tailscale says owns this device (Tailscale route only).
         var peer: Tailscale.Peer?
+        /// What this device's Touch Bar shows.
+        var interest = AgentInterest()
 
         init(connection: NWConnection, address: String, input: InputTarget) {
             self.connection = connection
@@ -38,7 +40,7 @@ public final class SocketServer {
         var ks: [String]?
     }
 
-    private static let inputTypes: Set = ["kd", "ku", "mv", "md", "mu", "sc", "sys", "txt", "combo", "focus"]
+    private static let inputTypes: Set = ["kd", "ku", "mv", "md", "mu", "sc", "sys", "txt", "combo", "focus", "openTask"]
 
     /// Shown next to device names, e.g. "iPad · Tailscale".
     let route: String
@@ -54,6 +56,9 @@ public final class SocketServer {
     /// (opening it if needed), from its app hotkey tabs; if given, its window
     /// whose title includes the second string (e.g. "codex") comes first.
     public var onFocusApp: ((String, String?) -> Void)?
+    /// A device asked to open one of the agent tasks it was sent (by ID),
+    /// from the Touch Bar.
+    public var onOpenTask: ((String) -> Void)?
     /// A device sent input (used to show "input flowing").
     var onInput: ((String) -> Void)?
     /// A device's measured round-trip time, in milliseconds.
@@ -75,6 +80,13 @@ public final class SocketServer {
     private let pairing: Pairing
     private let makeInput: () -> InputTarget
     private var clients: [ObjectIdentifier: Client] = [:]
+
+    /// What this server's devices' Touch Bars show, all together.
+    var agentInterest: AgentInterest {
+        clients.values.filter { $0.deviceID != nil }.reduce(AgentInterest()) { $0.union($1.interest) }
+    }
+    /// What devices want from the agents changed.
+    var onAgentInterest: (() -> Void)?
 
     /// IDs of paired devices connected right now.
     public var connectedDeviceIDs: [String] { clients.values.compactMap(\.deviceID) }
@@ -161,6 +173,19 @@ public final class SocketServer {
         }
     }
 
+    /// Sends agent activity (see `AgentMonitor`) to the devices that asked,
+    /// each getting only the agents, and usage, it asked for.
+    func sendAgents(_ payload: [String: Any]) {
+        guard let apps = payload["apps"] as? [String: [String: Any]] else { return }
+        for client in clients.values where client.deviceID != nil && !client.interest.apps.isEmpty {
+            var mine = apps.filter { client.interest.apps.contains($0.key) }
+            if !client.interest.usage { mine = mine.mapValues { $0.filter { $0.key != "usage" } } }
+            var message = payload
+            message["apps"] = mine
+            reply(client, message)
+        }
+    }
+
     /// Disconnects a device right away (for example after it's revoked).
     func disconnect(deviceID: String?) {
         for client in clients.values where deviceID == nil || client.deviceID == deviceID {
@@ -213,6 +238,7 @@ public final class SocketServer {
             Log.info("Disconnected \(client.address)")
             onChange?()
         }
+        if client.interest != AgentInterest() { onAgentInterest?() }
     }
 
     private func receive(_ client: Client) {
@@ -273,6 +299,13 @@ public final class SocketServer {
                     self.reply(client, ["t": "icons", "icons": icons])
                 }
             }
+        case "agents":
+            // Which agents' tasks the Touch Bar shows (none to stop), and
+            // whether it shows plan usage.
+            let interest = AgentInterest(apps: Set(message.ks ?? []), usage: message.r ?? false)
+            guard interest != client.interest else { return }
+            client.interest = interest
+            onAgentInterest?()
         case "probe":
             if let sent = message.n.flatMap(Int.init) {
                 onLatency?(deviceID, max(0, Self.uptimeMilliseconds - sent))
@@ -294,6 +327,8 @@ public final class SocketServer {
         case "txt": if let text = message.s, text.count <= 4000 { input.type(text) }
         case "focus":
             if let id = message.k, Self.isBundleID(id) { onFocusApp?(id, message.s.flatMap(Self.windowHint)) }
+        case "openTask":
+            if let id = message.k, (1...200).contains(id.count) { onOpenTask?(id) }
         default: break
         }
         if Self.inputTypes.contains(message.t) && !isPaused() { onInput?(deviceID) }

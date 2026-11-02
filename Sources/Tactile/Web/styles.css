@@ -490,6 +490,10 @@ html { touch-action: none; }
 .palm-side { display: none; }
 [data-controls="palm"] .toolbar { display: none; }
 [data-controls="palm"] .stage { padding-top: max(12px, env(safe-area-inset-top)); }
+/* Trackpad only has no keyboard frame above it, so its top row (status, the
+   Touch Bar and app tabs) keeps the frame's distance from the top edge, out
+   from under the status bar, where the Touch Bar sits with the keyboard. */
+[data-layout="trackpad"][data-controls="palm"] .stage { padding-top: calc(max(12px, env(safe-area-inset-top)) + var(--deck-pad)); }
 [data-controls="palm"] .palm {
   flex: 1;
   min-height: 0;
@@ -927,6 +931,215 @@ html { touch-action: none; }
 .arrow-down { grid-area: 2 / 2; }
 .arrow-right { grid-area: 2 / 3; }
 .lg-arrow svg { width: calc(var(--u) * 0.2); height: calc(var(--u) * 0.2); display: block; }
+
+/* ───────────────────────── Touch Bar ───────────────────────── */
+
+/* A black glass strip in place of the function row, like a MacBook's, on
+   every skin. It keeps a fixed height (app.js sets --tbh) so the keys, not
+   the strip, take extra room. Holding fn shows F1–F12 in its place. */
+.touchbar { display: none; }
+[data-function-row="touchbar"] .touchbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: var(--tbh, 44px);
+  padding: 0 5px;
+  box-sizing: border-box;
+  overflow: hidden;
+  border-radius: calc(var(--u) * 0.11);
+  background: #000;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font: 15px/1 var(--font);
+  -webkit-font-smoothing: antialiased;
+  -webkit-user-select: none;
+  user-select: none;
+  container-type: inline-size;
+}
+[data-function-row="touchbar"] .key-row-function { display: none; }
+[data-function-row="touchbar"] .key-row-function .key { height: var(--tbh, 44px); }
+[data-function-row="touchbar"] .deck:has([data-code="Fn"].on) .key-row-function { display: flex; }
+[data-function-row="touchbar"] .deck:has([data-code="Fn"].on) .touchbar { display: none; }
+
+/* Trackpad only: across the top, over the palm rests and the trackpad, as
+   wide as it is above the keys. */
+[data-layout="trackpad"] .touchbar { border-radius: 14px; }
+[data-layout="trackpad"][data-function-row="touchbar"][data-controls="palm"] .palm { grid-template-rows: auto minmax(0, 1fr); }
+[data-layout="trackpad"][data-function-row="touchbar"][data-controls="palm"] .palm > .touchbar { grid-area: 1 / 1 / 2 / -1; }
+[data-layout="trackpad"][data-function-row="touchbar"][data-controls="palm"] #palmLeft { grid-area: 2 / 1; }
+[data-layout="trackpad"][data-function-row="touchbar"][data-controls="palm"] .palm .trackpad { grid-area: 2 / 2; }
+[data-layout="trackpad"][data-function-row="touchbar"][data-controls="palm"] .palm-right { grid-area: 2 / 3; }
+
+.tb {
+  position: relative;
+  flex: none;
+  height: calc(100% - 8px);
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 7px;
+  background: #3a3a3c;
+  color: #fff;
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 120ms ease;
+}
+/* Every button is at least 44 pt tall to touch, however slim it looks. */
+.tb::after { content: ""; position: absolute; inset: -4px 0; }
+.tb:active { background: #5b5b5f; }
+.tb svg { width: 20px; height: 20px; display: block; }
+.tb.selected { box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.85); }
+.tb-esc { width: 64px; }
+.tb-close { width: 44px; padding: 0; color: rgba(235, 235, 245, 0.75); }
+.tb-icon { width: 22px; height: 22px; border-radius: 5px; flex: none; }
+.tb-name { font-weight: 600; }
+.tb-middle { flex: 1; min-width: 0; height: 100%; display: flex; align-items: center; gap: 6px; overflow: hidden; }
+.tb-quiet { padding: 0 8px; color: rgba(235, 235, 245, 0.55); font-size: 13px; white-space: nowrap; }
+.tb-label { flex: none; display: flex; align-items: center; padding: 0 6px; }
+.tb-divider { flex: none; width: 1px; height: 50%; background: rgba(255, 255, 255, 0.18); }
+
+/* The Control Strip, joined into one rounded bar after its ‹. */
+.tb-strip { flex: none; display: flex; align-items: center; gap: 2px; height: 100%; }
+.tb-strip .tb { width: 52px; padding: 0; border-radius: 0; }
+.tb-strip .tb-chevron { width: 30px; min-width: 30px; margin-right: 4px; background: none; color: rgba(235, 235, 245, 0.7); }
+.tb-strip .tb-chevron + .tb { border-radius: 7px 0 0 7px; }
+.tb-strip .tb:last-child { border-radius: 0 7px 7px 0; }
+.touchbar[data-view="controls"] .tb-control { flex: 1; padding: 0; }
+
+/* Plan usage and task status: color always comes with a shape. */
+.tb-meter { flex: none; display: block; width: 44px; height: 6px; border-radius: 3px; overflow: hidden; background: rgba(255, 255, 255, 0.22); }
+.tb-meter i { display: block; width: calc(var(--p) * 1%); height: 100%; border-radius: 3px; background: #fff; }
+.tb-meter.wide { width: 64px; }
+.tb-percent, .tb-count { font-weight: 600; font-variant-numeric: tabular-nums; }
+.tb-count { display: inline-flex; align-items: center; gap: 4px; }
+.tb-glyph {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  box-sizing: border-box;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+}
+.tb-glyph.working { border: 2px solid rgba(10, 132, 255, 0.35); border-top-color: #0A84FF; animation: tb-spin 1s linear infinite; }
+.tb-glyph.waiting { background: #FF9F0A; color: #000; }
+.tb-glyph.done { background: #30D158; color: #000; }
+@keyframes tb-spin { to { transform: rotate(1turn); } }
+.tb-agent.needs, .tb-chip.waiting { background: rgba(255, 159, 10, 0.32); }
+
+/* An agent's tasks, scrolling sideways like a Touch Bar scrubber. */
+.tb-usage { gap: 10px; padding: 0 8px 0 4px; background: none; }
+.tb-reset, .tb-age { color: rgba(235, 235, 245, 0.55); font-size: 13px; font-variant-numeric: tabular-nums; }
+.tb-scroll {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 24px), transparent);
+  mask-image: linear-gradient(90deg, #000 calc(100% - 24px), transparent);
+}
+.tb-scroll::-webkit-scrollbar { display: none; }
+/* The stage turns off panning everywhere; tasks scroll sideways. */
+.tb-scroll, .tb-scroll * { touch-action: pan-x; }
+.tb-chip { max-width: 270px; }
+.tb-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+/* Narrow strips (Trackpad only, portrait) drop the extras first. */
+@container (max-width: 760px) {
+  .tb-optional, .tb-agent .tb-meter, .tb-reset { display: none; }
+}
+
+/* A task's steps, or plan usage, in a popover under what was tapped: sized
+   like an iPad popover, one step smaller in type than a sheet. */
+.tb-scrim { position: fixed; inset: 0; z-index: 8; }
+.tb-scrim[hidden] { display: none; }
+.tb-card {
+  position: fixed;
+  box-sizing: border-box;
+  width: min(360px, 100vw - 24px);
+  padding: 14px 16px 16px;
+  border-radius: 16px;
+  background: #1c1c1e;
+  color: var(--text);
+  font: 14px/1.35 var(--font);
+  text-align: left;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  animation: tb-card-in 180ms var(--ease);
+}
+[data-skin="silver"] .tb-card { background: #fff; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25); }
+.tb-card::before {
+  content: "";
+  position: absolute;
+  top: -7px;
+  left: calc(var(--arrow, 50%) - 8px);
+  width: 16px;
+  height: 16px;
+  border-radius: 3px 0 0 0;
+  background: inherit;
+  transform: rotate(45deg);
+}
+.tb-card.above::before { top: auto; bottom: -7px; border-radius: 0 0 3px 0; }
+@keyframes tb-card-in { from { opacity: 0; transform: translateY(-6px) scale(0.98); } }
+.tb-card.wide { width: min(420px, 100vw - 24px); }
+.card-title { margin: 0 0 2px; font: 600 15px/1.3 var(--font-display); }
+.card-meta { display: flex; align-items: center; gap: 6px; margin: 0 0 12px; color: var(--text-2); font-size: 12px; }
+.card-meta .tb-glyph { width: 12px; height: 12px; }
+.card-ask { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; padding: 8px 10px; border-radius: 10px; background: rgba(255, 159, 10, 0.18); font-size: 13px; }
+.card-ask code { font: 12px/1.4 ui-monospace, "SF Mono", Menlo, monospace; word-break: break-word; }
+.card-step-count { margin-bottom: 8px; color: var(--text-2); font-size: 12px; font-weight: 600; }
+/* About five steps show; a longer plan scrolls. */
+.card-steps { display: flex; flex-direction: column; gap: 7px; max-height: 130px; margin: 0 0 10px; padding: 0; overflow-y: auto; list-style: none; }
+.card-steps li { display: flex; align-items: flex-start; gap: 9px; }
+.card-steps li.todo { color: var(--text-2); }
+.card-steps li.current { font-weight: 600; }
+.step-mark { flex: none; width: 14px; height: 14px; box-sizing: border-box; display: grid; place-items: center; margin-top: 2px; border-radius: 50%; font-size: 9px; font-weight: 800; }
+li.done .step-mark { background: var(--green); color: #000; }
+li.current .step-mark { border: 1.5px solid color-mix(in srgb, var(--accent) 30%, transparent); border-top-color: var(--accent); animation: tb-spin 1s linear infinite; }
+li.todo .step-mark { border: 1.25px solid var(--text-2); }
+.card-now { margin: 0 0 12px; color: var(--text-2); font-size: 13px; }
+.card-now b { color: var(--text); font-weight: 600; }
+/* A 36 pt pill that's 44 pt to touch. */
+.card-button {
+  position: relative;
+  width: 100%;
+  height: 36px;
+  margin-top: 2px;
+  border: none;
+  border-radius: 18px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 160ms var(--ease), opacity 160ms;
+}
+.card-button::after { content: ""; position: absolute; inset: -4px 0; }
+.card-button:active { transform: scale(0.97); opacity: 0.85; }
+.card-button.tinted { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+.card-limit { margin-bottom: 12px; }
+.card-limit-top { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 6px; font-size: 14px; }
+.card-limit-top span { color: var(--text-2); }
+.tb-card .tb-meter { width: 100%; background: var(--fill); }
+.tb-card .tb-meter i { background: var(--accent); }
+
+.agent-label { display: flex; align-items: center; gap: 10px; }
+.agent-label img { width: 24px; height: 24px; border-radius: 6px; }
+.agent-label img[hidden] { display: none; }
 
 /* ───────────────────────── Trackpad ───────────────────────── */
 

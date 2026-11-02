@@ -130,9 +130,10 @@ export class Connection extends EventTarget {
         if (message.token) storage.set(TOKEN_KEY, message.token);
         this.macName = message.name || 'Mac';
         this.#setState('ready');
-      } else if (['layout', 'app', 'icons'].includes(message.t)) {
+      } else if (['layout', 'app', 'icons', 'agentApps', 'agents'].includes(message.t)) {
         // About the Mac: its keyboard layout (for key labels), the app in front
-        // and app icons (for hotkeys).
+        // and app icons (for hotkeys), and what Claude and Codex are doing
+        // (for the Touch Bar).
         this.dispatchEvent(new CustomEvent(message.t, { detail: message }));
       } else if (message.t === 'pair') {
         storage.remove(TOKEN_KEY);

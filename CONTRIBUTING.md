@@ -27,7 +27,7 @@ swift run tactile-checks             # Swift checks, then the web tests in WebKi
 swift run tactile-checks --no-web    # Swift checks only
 ```
 
-The Command Line Tools ship neither XCTest nor Swift Testing, so the checks are a small executable (`Tests/TactileChecks`) that works with any Swift toolchain. It covers pairing, the Tailscale owner check, key maps, the web server and the WebSocket protocol, and then runs `Tests/Web` in a WebKit view and reports each web test.
+The Command Line Tools ship neither XCTest nor Swift Testing, so the checks are a small executable (`Tests/TactileChecks`) that works with any Swift toolchain. It covers pairing, the Tailscale owner check, key maps, the web server, the WebSocket protocol and the Touch Bar's reading of Claude's and Codex's files, and then runs `Tests/Web` in a WebKit view and reports each web test.
 
 To work on the web tests in a browser, serve the repository root and open the test page:
 
@@ -52,7 +52,7 @@ Add a test with every bug fix: a test that fails before the fix and passes after
 
 ## Pull requests
 
-Keep each pull request to one change, describe what it changes for someone using Tactile, and make sure `swift run tactile-checks` passes. Add a line to [CHANGELOG.md](CHANGELOG.md) for anything people will notice. To add hotkeys for another app, see [docs/app-hotkeys.md](docs/app-hotkeys.md).
+Keep each pull request to one change, describe what it changes for someone using Tactile, and make sure `swift run tactile-checks` passes. Add a line to [CHANGELOG.md](CHANGELOG.md) for anything people will notice. To add hotkeys for another app, see [docs/app-hotkeys.md](docs/app-hotkeys.md); to show another coding agent on the Touch Bar, see [docs/touch-bar.md](docs/touch-bar.md).
 
 Everyone taking part is expected to follow the [code of conduct](CODE_OF_CONDUCT.md).
 

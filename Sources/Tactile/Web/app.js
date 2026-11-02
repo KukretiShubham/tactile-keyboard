@@ -7,6 +7,7 @@ import { createPairingSheet } from './pairing-sheet.js';
 import { setupSheets } from './sheets.js';
 import { createHotkeyEditor } from './hotkey-editor.js';
 import { createShortcuts, PACK_ICON_APPS } from './shortcuts.js';
+import { createTouchBar } from './touchbar.js';
 import { createTrackpad } from './trackpad.js';
 import { TypingModel } from './typing-model.js';
 import { clamp, contentBox, storage } from './util.js';
@@ -85,6 +86,7 @@ const hotkeyEditor = createHotkeyEditor({
     recordKeys = handler;
   },
 });
+const touchBar = createTouchBar({ send, feedback, settings, isReady: () => connection.state === 'ready' });
 const pairingSheet = createPairingSheet(connection);
 const sheets = setupSheets({
   connection, feedback, settings, typingModel,
@@ -95,7 +97,19 @@ const sheets = setupSheets({
 
 // App hotkeys follow the app in front on the Mac, with icons from its apps.
 connection.addEventListener('app', ({ detail }) => shortcuts.setFrontApp({ id: detail.id, name: detail.name }));
-connection.addEventListener('icons', ({ detail }) => shortcuts.setIcons(detail.icons ?? {}));
+connection.addEventListener('icons', ({ detail }) => {
+  const icons = detail.icons ?? {};
+  shortcuts.setIcons(icons);
+  touchBar.setIcons(icons);
+  sheets.setAgentIcons(icons);
+});
+// The Touch Bar shows what Claude and Codex are doing on the Mac.
+connection.addEventListener('agentApps', ({ detail }) => {
+  const apps = detail.apps ?? [];
+  touchBar.setInstalled(apps);
+  sheets.setAgentApps(apps);
+});
+connection.addEventListener('agents', ({ detail }) => touchBar.setActivity(detail));
 
 // Key labels and shortcuts follow the Mac's keyboard layout.
 let macLabels = {};
@@ -118,16 +132,22 @@ function applySkin() {
   sheets.sync();
 }
 
+// The Touch Bar is a fixed height, at least 44 pt to touch. At Expanded size
+// it grows a little with the keys, up to this.
+const TOUCH_BAR_HEIGHT = 44;
+const TOUCH_BAR_MAX = 56;
+
 // Size keys from the space available so the whole keyboard always fits,
 // in landscape or portrait, with or without the trackpad.
 function fit() {
   const layout = settings.get('layout');
   const functionRow = settings.get('functionRow');
+  const hasTouchBar = functionRow === 'touchbar';
   const size = layout === 'keyboard' ? settings.get('keyboardSize') : 'fit';
   const expanded = size === 'expanded';
   const floats = size === 'floating';
   app.dataset.layout = layout;
-  app.dataset.functionRow = functionRow ? 'on' : 'off';
+  app.dataset.functionRow = functionRow;
   app.dataset.position = settings.get('keyboardPosition');
   app.dataset.size = size;
   // In landscape, height is what's scarce: with the trackpad showing, it sits
@@ -140,6 +160,7 @@ function fit() {
   const place = palmRests ? (shelf ? 'shelf' : 'beside') : null;
   app.dataset.controls = place ? 'palm' : 'bar';
   placeControls(place);
+  placeTouchBar(layout === 'trackpad');
   const { width, height, paddingLeft, paddingTop } = contentBox(stage);
 
   const gap = clamp(width * 0.0055, 4, 8);
@@ -148,11 +169,15 @@ function fit() {
   // Taller keys give fingers more room vertically, where most misses happen.
   // Standard keys are square, like a Mac keyboard's.
   const keyHeightRatio = settings.get('keyHeight') === 'tall' ? 1.2 : 1;
-  const rows = functionRow ? 5.55 : 5;
-  const rowGaps = functionRow ? 5 : 4;
+  // F1–F12 are a little over half a key tall. The Touch Bar takes its own
+  // height instead, and the keys share the rest.
+  const rows = functionRow === 'keys' ? 5.55 : 5;
+  const rowGaps = functionRow === 'off' ? 4 : 5;
+  let touchBarHeight = TOUCH_BAR_HEIGHT;
+  const touchBarRoom = () => (hasTouchBar ? touchBarHeight : 0);
   const unitFromWidth = (width - 2 * pad - 13.5 * gap) / 14.5;
   const keyboardHeight = layout === 'both' || place === 'shelf' ? height * 0.62 - stageGap / 2 : height;
-  const unitFromHeight = (keyboardHeight - 2 * pad - rowGaps * gap) / (rows * keyHeightRatio);
+  const unitFromHeight = (keyboardHeight - 2 * pad - rowGaps * gap - touchBarRoom()) / (rows * keyHeightRatio);
   let unit = Math.max(20, Math.floor(Math.min(unitFromWidth, unitFromHeight) * 10) / 10);
 
   // Floating: the saved width sets the size, between keys of about 40 pt and
@@ -163,21 +188,27 @@ function fit() {
     floatMinWidth = minWidth;
     const deckWidth = clamp(frame.w * width, minWidth, width);
     const fromWidth = (deckWidth - 2 * pad - 13.5 * gap) / 14.5;
-    const fromHeight = (height - HANDLE_SPACE - 2 * pad - rowGaps * gap) / (rows * keyHeightRatio);
+    const fromHeight = (height - HANDLE_SPACE - 2 * pad - rowGaps * gap - touchBarRoom()) / (rows * keyHeightRatio);
     unit = Math.max(20, Math.floor(Math.min(fromWidth, fromHeight) * 10) / 10);
   }
 
   // Expanded: keys grow taller to fill the screen (up to 2.2× their width),
-  // so there's more to aim at when the trackpad is hidden.
+  // so there's more to aim at when the trackpad is hidden. The Touch Bar
+  // grows a little with them, but stays a strip: the keys get the space.
   let keyHeight = unit * keyHeightRatio;
   if (expanded) {
-    const fill = (height - 2 * pad - rowGaps * gap) / rows;
-    keyHeight = clamp(fill, keyHeight, unit * 2.2);
+    const fill = () => (height - 2 * pad - rowGaps * gap - touchBarRoom()) / rows;
+    keyHeight = clamp(fill(), keyHeight, unit * 2.2);
+    if (hasTouchBar) {
+      touchBarHeight = clamp(keyHeight * 0.55, TOUCH_BAR_HEIGHT, TOUCH_BAR_MAX);
+      keyHeight = clamp(fill(), unit * keyHeightRatio, unit * 2.2);
+    }
   }
 
   root.style.setProperty('--u', `${unit}px`);
   root.style.setProperty('--kh', `${keyHeight.toFixed(1)}px`);
   root.style.setProperty('--g', `${gap.toFixed(1)}px`);
+  root.style.setProperty('--tbh', `${touchBarHeight.toFixed(1)}px`);
   root.style.setProperty('--deck-pad', `${pad.toFixed(1)}px`);
   root.style.setProperty('--stage-gap', `${stageGap.toFixed(1)}px`);
 
@@ -192,6 +223,14 @@ function fit() {
   } else {
     deck.style.left = deck.style.top = '';
   }
+}
+
+// The Touch Bar sits at the top of the keyboard, or across the top in
+// Trackpad only.
+function placeTouchBar(overTrackpad) {
+  const parent = overTrackpad ? document.querySelector('.palm') : deck;
+  const before = overTrackpad ? document.getElementById('trackpad') : deck.querySelector('.key-row-function');
+  if (touchBar.element.parentNode !== parent) parent.insertBefore(touchBar.element, before);
 }
 
 // Moves the status, buttons and shortcuts between the top bar (null) and the
@@ -241,8 +280,10 @@ connection.addEventListener('state', ({ detail: state }) => {
   if (state === 'ready') {
     pairingSheet.hide();
     send({ t: 'icons', ks: PACK_ICON_APPS });
+    touchBar.subscribe();
   }
   if (state !== 'ready') {
+    touchBar.reset();
     keyboard.reset();
     trackpad.reset();
     shortcuts.releaseVoice();
@@ -285,7 +326,7 @@ document.addEventListener('visibilitychange', () => {
 // Buttons beside the trackpad are left alone, so their taps still click.
 for (const type of ['touchstart', 'touchmove', 'touchend']) {
   stage.addEventListener(type, (event) => {
-    if (!event.target.closest('button')) event.preventDefault();
+    if (!event.target.closest('button, .tb-scroll')) event.preventDefault();
   }, { passive: false });
 }
 for (const type of ['gesturestart', 'gesturechange', 'gestureend']) {
@@ -293,7 +334,7 @@ for (const type of ['gesturestart', 'gesturechange', 'gestureend']) {
 }
 document.addEventListener('contextmenu', (event) => event.preventDefault());
 document.addEventListener('touchmove', (event) => {
-  if (!event.target.closest('.sheet-scroll, textarea, .pack-tabs, .hotkey-apps')) event.preventDefault();
+  if (!event.target.closest('.sheet-scroll, textarea, .pack-tabs, .hotkey-apps, .tb-scroll, .tb-card')) event.preventDefault();
 }, { passive: false });
 
 connection.start();

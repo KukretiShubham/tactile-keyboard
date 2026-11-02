@@ -219,8 +219,9 @@ export function createKeyboard(root, { send, feedback, settings, model = null })
   }
 
   root.addEventListener('pointerdown', (event) => {
-    // The floating keyboard's handle and grip move it; they never type.
-    if (event.target.closest('.float-handle, .float-grip')) return;
+    // The floating keyboard's handle and grip move it, and the Touch Bar has
+    // its own buttons; they never type.
+    if (event.target.closest('.float-handle, .float-grip, .touchbar')) return;
     const key = keyAt(event);
     if (!key) return;
     event.preventDefault();

@@ -104,6 +104,7 @@ let layoutObserver = DistributedNotificationCenter.default().addObserver(
 // themselves.
 service.appIcons = { ids, done in DispatchQueue.main.async { done(AppIcons.dataURLs(for: ids)) } }
 service.focusApp = { id, hint in DispatchQueue.main.async { AppFocus.bring(id, window: hint) } }
+service.openURL = { url in DispatchQueue.main.async { NSWorkspace.shared.open(url) } }
 func reportFrontApp(_ app: NSRunningApplication?) {
     guard let app, let id = app.bundleIdentifier, id != Bundle.main.bundleIdentifier else { return }
     service.setFrontApp(id: id, name: app.localizedName ?? id)

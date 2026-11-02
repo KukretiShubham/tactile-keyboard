@@ -6,5 +6,6 @@ let checks = Checks()
 SecurityChecks.run(checks)
 InputChecks.run(checks)
 NetworkChecks.run(checks)
+AgentChecks.run(checks)
 if !CommandLine.arguments.contains("--no-web") { WebChecks.run(checks) }
 exit(checks.finish())
