@@ -266,6 +266,10 @@ const LABELS = {
   held: 'Disconnected by your Mac',
   refused: 'Not allowed: sign in to Tailscale as the Mac’s owner',
 };
+// The Mac serves this page, so a Mac that comes back on a new version (it
+// updated itself) has a new page to go with it.
+let pageVersion = null;
+
 connection.addEventListener('state', ({ detail: state }) => {
   status.dataset.state = state;
   statusLabel.textContent = state === 'ready' ? connection.macName : LABELS[state];
@@ -278,6 +282,11 @@ connection.addEventListener('state', ({ detail: state }) => {
     }
   }
   if (state === 'ready') {
+    if (pageVersion && connection.macVersion && connection.macVersion !== pageVersion) {
+      location.reload();
+      return;
+    }
+    pageVersion ??= connection.macVersion;
     pairingSheet.hide();
     send({ t: 'icons', ks: PACK_ICON_APPS });
     touchBar.subscribe();

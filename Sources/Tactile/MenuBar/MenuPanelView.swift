@@ -12,6 +12,10 @@ final class PanelModel: ObservableObject {
     @Published var openAtLogin = false
     @Published var loginAvailable = false
     @Published var confirmingRevoke: String?
+    /// Release builds update themselves; others have no update row.
+    @Published var updatesEnabled = false
+    @Published var update: Updater.State = .idle
+    @Published var checkForUpdates = true
 
     var actions = Actions()
 
@@ -30,6 +34,11 @@ final class PanelModel: ObservableObject {
         var copyTailscaleLink: () -> Void = {}
         var allowAccessibility: () -> Void = {}
         var showLog: () -> Void = {}
+        var checkForUpdates: () -> Void = {}
+        var installUpdate: () -> Void = {}
+        var cancelUpdate: () -> Void = {}
+        var showReleaseNotes: () -> Void = {}
+        var setCheckForUpdates: (Bool) -> Void = { _ in }
         var quit: () -> Void = {}
     }
 }
@@ -65,6 +74,11 @@ struct MenuPanelView: View {
                 PanelDivider()
                 SectionTitle("Details")
                 details(state)
+            }
+
+            if model.updatesEnabled {
+                PanelDivider()
+                updateRow
             }
 
             PanelDivider()
@@ -176,12 +190,33 @@ struct MenuPanelView: View {
         }
     }
 
+    // MARK: Updates
+
+    @ViewBuilder
+    private var updateRow: some View {
+        switch model.update {
+        case .idle:
+            ActionRow(symbol: "arrow.down.circle", title: "Check for Updates…", action: model.actions.checkForUpdates)
+        case .checking:
+            ActionRow(symbol: "arrow.down.circle", title: "Checking for Updates…", enabled: false) {}
+        case .upToDate(let version):
+            ActionRow(symbol: "checkmark.circle", title: "Tactile \(version) Is Up to Date",
+                      tint: Color(nsColor: .systemGreen), action: model.actions.checkForUpdates)
+        default:
+            UpdateRow(update: model.update, actions: model.actions)
+        }
+    }
+
     // MARK: Details (shown while ⌥ is held)
 
     private func details(_ state: TactileService.Snapshot) -> some View {
         let bytes = state.fingerprint.split(separator: " ")
         let fingerprint = bytes.count > 8 ? "\(bytes.prefix(4).joined(separator: " ")) … \(bytes.suffix(4).joined(separator: " "))" : state.fingerprint
         return VStack(spacing: 0) {
+            if model.updatesEnabled {
+                SwitchRow(symbol: "arrow.triangle.2.circlepath", title: "Check for Updates Automatically",
+                          isOn: model.checkForUpdates) { model.actions.setCheckForUpdates(!model.checkForUpdates) }
+            }
             DetailRow(label: "Setup page", value: state.setupHost)
             DetailRow(label: "Secure ports", value: state.portsSummary)
             DetailRow(label: "Certificate", value: fingerprint)
@@ -410,6 +445,111 @@ private struct ActionRow: View {
         .padding(.horizontal, 6)
         .disabled(!enabled)
         .opacity(enabled ? 1 : 0.45)
+        .onHover { hovering = $0 }
+    }
+}
+
+/// An update on offer, in one menu row tinted with the accent color: the row
+/// itself updates, What's New sits at its end. Downloading, restarting and
+/// failing take the same row, so the panel never grows for an update.
+private struct UpdateRow: View {
+    let update: Updater.State
+    let actions: PanelModel.Actions
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: primary) {
+            HStack(spacing: 10) {
+                icon.frame(width: 18)
+                Text(title).font(.system(size: 13, weight: .medium)).foregroundStyle(tint).lineLimit(1)
+                Spacer(minLength: 6)
+                trailing
+            }
+            .padding(.horizontal, 8)
+            .frame(height: 28)
+            .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(tint.opacity(hovering ? 0.16 : 0.1)))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 6)
+        .onHover { hovering = $0 }
+        .help(reason ?? "")
+    }
+
+    private var tint: Color {
+        if case .failed = update { return Color(nsColor: .systemOrange) }
+        return .accentColor
+    }
+
+    private var reason: String? {
+        if case .failed(_, let reason, _) = update { return reason }
+        return nil
+    }
+
+    private var title: String {
+        switch update {
+        case .available(let release): "Update to Tactile \(release.version)"
+        case .downloading(let release, let progress): "Downloading \(release.version)… \(Int(progress * 100))%"
+        case .installing(let release): "Restarting with \(release.version)…"
+        case .failed: "Couldn’t Update"
+        default: ""
+        }
+    }
+
+    /// What clicking the row does.
+    private func primary() {
+        switch update {
+        case .available, .failed(_, _, true): actions.installUpdate()
+        case .failed: actions.showReleaseNotes()
+        default: break
+        }
+    }
+
+    @ViewBuilder private var icon: some View {
+        switch update {
+        case .downloading(_, let progress):
+            ZStack {
+                Circle().stroke(tint.opacity(0.25), lineWidth: 2)
+                Circle().trim(from: 0, to: progress).stroke(tint, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+            }
+            .frame(width: 13, height: 13)
+        case .installing:
+            Image(systemName: "arrow.triangle.2.circlepath").font(.system(size: 12, weight: .semibold)).foregroundStyle(tint)
+        case .failed:
+            Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 12, weight: .semibold)).foregroundStyle(tint)
+        default:
+            Image(systemName: "arrow.down.circle.fill").font(.system(size: 14, weight: .semibold)).foregroundStyle(tint)
+        }
+    }
+
+    @ViewBuilder private var trailing: some View {
+        switch update {
+        case .available: TextButton("What’s New", action: actions.showReleaseNotes)
+        case .downloading: TextButton("Cancel", action: actions.cancelUpdate)
+        case .failed(_, _, true): Text("Try Again").font(.system(size: 12, weight: .medium)).foregroundStyle(tint)
+        case .failed: Text("Download…").font(.system(size: 12, weight: .medium)).foregroundStyle(tint)
+        default: EmptyView()
+        }
+    }
+}
+
+/// Quiet text that's a button of its own, inside a row that's one too.
+private struct TextButton: View {
+    let text: String
+    let action: () -> Void
+    @State private var hovering = false
+
+    init(_ text: String, action: @escaping () -> Void) {
+        self.text = text
+        self.action = action
+    }
+
+    var body: some View {
+        Button(action: action) {
+            Text(text).font(.system(size: 12)).foregroundStyle(hovering ? .primary : .secondary)
+        }
+        .buttonStyle(.plain)
         .onHover { hovering = $0 }
     }
 }

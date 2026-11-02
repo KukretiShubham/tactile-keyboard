@@ -1,8 +1,13 @@
 # Publishes a release when a version tag (e.g. v1.0.0) is pushed: runs the
-# checks, builds a universal Tactile.app, and attaches it as a zip with its
-# SHA-256 checksum and a build provenance attestation, so anyone can verify the
-# download was built here from the tagged code. The release notes are the
-# tag's message.
+# checks, builds a universal Tactile.app signed with the release certificate,
+# and attaches it as a zip with its SHA-256 checksum and a build provenance
+# attestation, so anyone can verify the download was built here from the
+# tagged code. The release notes are the tag's message.
+#
+# The certificate (repository secrets TACTILE_SIGNING_CERTIFICATE and
+# TACTILE_SIGNING_PASSWORD, made by scripts/create-release-certificate.sh)
+# keeps Tactile's Accessibility permission across updates, and installed
+# copies update only to apps signed with it.
 name: Release
 
 on:
@@ -31,8 +36,27 @@ jobs:
           fi
       - name: Run the checks
         run: swift run tactile-checks
+      - name: Load the release certificate
+        env:
+          CERTIFICATE: ${{ secrets.TACTILE_SIGNING_CERTIFICATE }}
+          PASSWORD: ${{ secrets.TACTILE_SIGNING_PASSWORD }}
+        run: |
+          if [[ -z "$CERTIFICATE" || -z "$PASSWORD" ]]; then
+            echo "::error::The release certificate secrets are missing; see Releasing in CONTRIBUTING.md."
+            exit 1
+          fi
+          keychain="$RUNNER_TEMP/release.keychain-db"
+          unlock="$(openssl rand -hex 16)"
+          security create-keychain -p "$unlock" "$keychain"
+          security set-keychain-settings -lut 3600 "$keychain"
+          security unlock-keychain -p "$unlock" "$keychain"
+          echo "$CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/release.p12"
+          security import "$RUNNER_TEMP/release.p12" -k "$keychain" -P "$PASSWORD" -T /usr/bin/codesign
+          rm "$RUNNER_TEMP/release.p12"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$unlock" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
       - name: Build Tactile.app
-        run: UNIVERSAL=1 scripts/build-app.sh
+        run: RELEASE=1 UNIVERSAL=1 SIGNING_IDENTITY="Tactile Release Signing" scripts/build-app.sh
       - name: Package
         run: |
           zip="Tactile-$GITHUB_REF_NAME.zip"
@@ -50,3 +74,6 @@ jobs:
         run: |
           gh release create "$GITHUB_REF_NAME" "Tactile-$GITHUB_REF_NAME.zip" "Tactile-$GITHUB_REF_NAME.zip.sha256" \
             --title "Tactile ${GITHUB_REF_NAME#v}" --notes-from-tag --verify-tag
+      - name: Remove the release certificate
+        if: always()
+        run: security delete-keychain "$RUNNER_TEMP/release.keychain-db" 2>/dev/null || true

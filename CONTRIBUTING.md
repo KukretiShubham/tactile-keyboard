@@ -58,10 +58,11 @@ Everyone taking part is expected to follow the [code of conduct](CODE_OF_CONDUCT
 
 ## Releasing
 
+0. **Once per project:** run `scripts/create-release-certificate.sh <backup.p12>`. It makes the "Tactile Release Signing" certificate, stores it in the repository's secrets for the release workflow, and saves a backup. Keep the backup and its password safe: installed copies update only to apps signed with this certificate, so a new one means everyone installing the next release by hand.
 1. Set the new version in `Packaging/Info.plist` (`CFBundleShortVersionString`, e.g. `1.1.0`), give it a heading in `CHANGELOG.md`, and commit both.
 2. Tag the commit with release notes as the tag message, and push the tag:
    ```sh
    git tag -s v1.1.0
    git push origin v1.1.0
    ```
-3. The **Release** workflow runs the checks, builds a universal `Tactile.app`, and publishes it with a checksum (and, for public repositories, a build provenance attestation). It refuses a tag that doesn't match the version in `Info.plist`.
+3. The **Release** workflow runs the checks, builds a universal `Tactile.app` signed with the release certificate, and publishes it with a checksum (and, for public repositories, a build provenance attestation). It refuses a tag that doesn't match the version in `Info.plist`.

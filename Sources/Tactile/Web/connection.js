@@ -21,6 +21,8 @@ export class Connection extends EventTarget {
   #held = false;
   state = 'connecting';
   macName = '';
+  // Tactile's version on the Mac (none from a development build).
+  macVersion = null;
 
   async start() {
     try {
@@ -129,6 +131,7 @@ export class Connection extends EventTarget {
         this.#held = false;
         if (message.token) storage.set(TOKEN_KEY, message.token);
         this.macName = message.name || 'Mac';
+        this.macVersion = message.version ?? null;
         this.#setState('ready');
       } else if (['layout', 'app', 'icons', 'agentApps', 'agents'].includes(message.t)) {
         // About the Mac: its keyboard layout (for key labels), the app in front

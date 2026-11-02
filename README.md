@@ -63,7 +63,7 @@ Paste this into Terminal:
 curl -fsSL https://raw.githubusercontent.com/KukretiShubham/tactile-keyboard/main/install.sh | sh
 ```
 
-It downloads the latest release, checks its checksum (and its build provenance, if you have the [GitHub CLI](https://cli.github.com)), installs **Tactile.app** in Applications and opens it. Run it again to update. To remove Tactile, add `-s -- --uninstall` after `sh`. The script is short; [read it](install.sh) first if you like.
+It downloads the latest release, checks its checksum (and its build provenance, if you have the [GitHub CLI](https://cli.github.com)), installs **Tactile.app** in Applications and opens it. Run it again to update, or update from Tactile's menu. To remove Tactile, add `-s -- --uninstall` after `sh`. The script is short; [read it](install.sh) first if you like.
 
 Then:
 
@@ -72,7 +72,7 @@ Then:
 
 Then tap Share → **Add to Home Screen** on the iPad for a full-screen app without Safari's toolbar.
 
-When you install a newer version, switch Tactile off and on again under Accessibility: macOS treats each version as a new app.
+From 1.4.0 on, Tactile updates itself from its menu and keeps the permission. If you install a version from before 1.4.0 by hand, switch Tactile off and on again under Accessibility: macOS treated each of those versions as a new app.
 
 ### Download it yourself
 
@@ -197,8 +197,15 @@ Click the Tactile icon in the menu bar to see connected devices with their conne
 - **Disconnect**, **Reconnect** or **Revoke** a device
 - turn Tailscale, **Only My Devices on Tailscale**, connection notifications and **Open at Login** on or off
 - **Pair a Device…** (⌘P) or **Copy Tailscale Link**
+- **Update to Tactile …** when a new version is out (a dot on the menu bar icon says so), or **Check for Updates…**
 
-Hold ⌥ while opening it for details: addresses, ports, certificate fingerprint and the log.
+Hold ⌥ while opening it for details: addresses, ports, certificate fingerprint, the log, and **Check for Updates Automatically**.
+
+### Updates
+
+Tactile checks for a new release once a day. When there is one, a dot appears on its menu bar icon, and the menu's bottom row reads **Update to Tactile …** (with **What's New** for the release notes). Click it, and Tactile downloads the new version, checks it, puts it in place of the old one and reopens. Your iPad reconnects and refreshes on its own, and the old version and the download are deleted.
+
+A download is installed only if it matches its published checksum and is signed with Tactile's release certificate, which only the release workflow can use; otherwise nothing changes. Copies you build yourself don't update themselves.
 
 ## Security and privacy
 
@@ -208,14 +215,15 @@ Tactile can type on your Mac, so it's built to be careful:
 - **Paired, not open:** a new device needs a six-digit code that works once, and only ever travels over HTTPS. Wrong guesses lock out quickly. Remembered devices hold a random 256-bit token that the Mac stores only as a hash, and expire after 90 days unused.
 - **Only your devices on Tailscale:** Tactile asks Tailscale who owns each device and refuses anything not signed in as you, before it can even try to pair.
 - **A limited certificate:** the local certificate authority can only vouch for `.local` names and private addresses, so it can't be used to impersonate websites.
-- **Nothing leaves your network:** no accounts, no analytics, no cloud service. What Adapt to My Typing learns stays on the iPad. Your paired iPad is told the name of the app in front on the Mac, for app hotkeys, and, with the Touch Bar on, the titles and steps of Claude's and Codex's recent tasks and your plan usage.
+- **Genuine updates only:** an update is installed only if it matches its checksum and carries the same release signature as the Tactile you're running.
+- **Nothing leaves your network:** no accounts, no analytics, no cloud service; the only outside request is the daily check of Tactile's GitHub releases. What Adapt to My Typing learns stays on the iPad. Your paired iPad is told the name of the app in front on the Mac, for app hotkeys, and, with the Touch Bar on, the titles and steps of Claude's and Codex's recent tasks and your plan usage.
 
 Found a security problem? Please report it privately, as described in [SECURITY.md](SECURITY.md).
 
 ## Troubleshooting
 
 - **"Mac not reachable":** check that both devices are on the same network (guest and some office networks keep devices apart; Tailscale avoids this), that you allowed Tactile when macOS asked about incoming connections, and that nothing else uses ports 8420–8424 (or start Tactile with `--port`).
-- **Keys or the pointer do nothing:** check that Tactile is switched on under System Settings → Privacy & Security → Accessibility. After installing a new version, switch it off and on again.
+- **Keys or the pointer do nothing:** check that Tactile is switched on under System Settings → Privacy & Security → Accessibility. Updates from Tactile's menu keep the permission. After installing a version by hand from before 1.4.0, switch it off and on again.
 - **No key sounds:** Safari only plays sound after a tap; tap **Tap to enable key sounds** at the top. Check the volume, and **Sound in Silent Mode** if the iPad is muted.
 - **The Tailscale address is missing:** turn on MagicDNS and HTTPS Certificates in the Tailscale admin console, and make sure Tailscale is running on the Mac. Tactile adds the address as soon as Tailscale issues the certificate.
 - **"Not allowed" over Tailscale:** with **Only My Devices on Tailscale** on, the iPad must be signed in to Tailscale as the Mac's owner.

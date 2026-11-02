@@ -372,6 +372,8 @@ public final class SocketServer {
         pairing.markSeen(device.id)
         var payload = ["t": "ready", "name": HostInfo.computerName]
         if let token { payload["token"] = token }
+        // The page reloads itself when the Mac comes back on a new version.
+        if let version = HostInfo.appVersion { payload["version"] = version }
         reply(client, payload)
         welcomeMessages().forEach { reply(client, $0) }
         Log.info("Connected \(device.name) (\(client.address))")

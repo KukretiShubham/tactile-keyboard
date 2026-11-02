@@ -8,6 +8,11 @@ public enum HostInfo {
         (SCDynamicStoreCopyComputerName(nil, nil) as String?) ?? "Mac"
     }
 
+    /// Tactile's version, e.g. "1.4.0"; nil outside the app (`swift run`).
+    public static var appVersion: String? {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+    }
+
     public static var bonjourName: String? {
         (SCDynamicStoreCopyLocalHostName(nil) as String?).map { "\($0).local" }
     }

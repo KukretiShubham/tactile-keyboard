@@ -20,6 +20,17 @@ final class MenuBarController: NSObject {
     private var trustTimer: Timer?
     private var pauseHotKey: HotKey?
     private var screenLocked = false
+    private let updater: Updater?
+    private var updateTimer: Timer?
+    /// A dot on the icon while an update is on offer.
+    private let updateDot: NSView = {
+        let dot = NSView(frame: NSRect(x: 0, y: 0, width: 6, height: 6))
+        dot.wantsLayer = true
+        dot.layer?.backgroundColor = NSColor.controlAccentColor.cgColor
+        dot.layer?.cornerRadius = 3
+        dot.isHidden = true
+        return dot
+    }()
 
     private let defaults = UserDefaults.standard
 
@@ -27,7 +38,8 @@ final class MenuBarController: NSObject {
         self.service = service
         self.isApp = isApp
         notifier = isApp ? Notifier() : nil
-        defaults.register(defaults: ["pauseWhenLocked": true])
+        updater = Self.makeUpdater(isApp: isApp)
+        defaults.register(defaults: ["pauseWhenLocked": true, "checkForUpdates": true])
         super.init()
 
         if let button = statusItem.button {
@@ -35,9 +47,11 @@ final class MenuBarController: NSObject {
             button.target = self
             button.action = #selector(togglePanel)
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+            button.addSubview(updateDot)
         }
         configureModel()
         updateIcon()
+        watchForUpdates()
 
         service.observe { [weak self] state in
             self?.state = state
@@ -129,6 +143,20 @@ final class MenuBarController: NSObject {
                 self?.panel.dismiss()
                 Mac.showLog()
             },
+            checkForUpdates: { [weak self] in self?.updater?.check() },
+            installUpdate: { [weak self] in self?.updater?.install() },
+            cancelUpdate: { [weak self] in self?.updater?.cancel() },
+            showReleaseNotes: { [weak self] in
+                guard let self, let notes = model.update.release?.notes else { return }
+                panel.dismiss()
+                NSWorkspace.shared.open(notes)
+            },
+            setCheckForUpdates: { [weak self] on in
+                guard let self else { return }
+                defaults.set(on, forKey: "checkForUpdates")
+                model.checkForUpdates = on
+                scheduleUpdateChecks()
+            },
             quit: { [weak self] in
                 self?.service.stopAndWait()
                 NSApp.terminate(nil)
@@ -165,6 +193,12 @@ final class MenuBarController: NSObject {
         statusItem.button?.image = image
         statusItem.button?.appearsDisabled = state?.running == false
         statusItem.button?.toolTip = "Tactile — \(tooltip)"
+        if let button = statusItem.button {
+            let inset: CGFloat = 4
+            updateDot.frame.origin = NSPoint(x: button.bounds.maxX - updateDot.frame.width - inset,
+                                             y: button.isFlipped ? inset : button.bounds.maxY - updateDot.frame.height - inset)
+        }
+        if case .available = model.update { updateDot.isHidden = false } else { updateDot.isHidden = true }
     }
 
     private var tooltip: String {
@@ -175,6 +209,53 @@ final class MenuBarController: NSObject {
         if state.lockPaused { return "Paused while Mac is locked" }
         let names = state.devices.filter { state.connected.contains($0.id) }.map(\.name)
         return names.isEmpty ? "Waiting for a device" : "Connected: \(names.joined(separator: ", "))"
+    }
+
+    // MARK: Updates
+
+    /// Release builds (the release workflow marks them) keep themselves up to
+    /// date. Copies built on this Mac don't, so a local build is never replaced.
+    private static func makeUpdater(isApp: Bool) -> Updater? {
+        let info = Bundle.main.infoDictionary ?? [:]
+        guard isApp, info["TactileReleaseBuild"] as? Bool == true,
+              let version = info["CFBundleShortVersionString"] as? String else { return nil }
+        return Updater(currentVersion: version, appURL: Bundle.main.bundleURL)
+    }
+
+    private func watchForUpdates() {
+        guard let updater else { return }
+        model.updatesEnabled = true
+        model.checkForUpdates = defaults.bool(forKey: "checkForUpdates")
+        updater.onChange = { [weak self] state in
+            self?.model.update = state
+            self?.updateIcon()
+        }
+        updater.onInstalled = { [weak self] app in self?.reopen(into: app) }
+        scheduleUpdateChecks()
+    }
+
+    /// A quiet check soon after launch, then once a day, unless switched off.
+    private func scheduleUpdateChecks() {
+        updateTimer?.invalidate()
+        updateTimer = nil
+        guard let updater, defaults.bool(forKey: "checkForUpdates") else { return }
+        let timer = Timer(fire: Date().addingTimeInterval(15), interval: 24 * 60 * 60, repeats: true) { _ in
+            updater.check(quietly: true)
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        updateTimer = timer
+    }
+
+    /// Quits, letting go of every key the iPad holds, and opens the new
+    /// version as soon as this one has gone. Devices reconnect on their own.
+    private func reopen(into app: URL) {
+        service.stopAndWait()
+        let reopen = Process()
+        reopen.executableURL = URL(fileURLWithPath: "/bin/sh")
+        reopen.arguments = ["-c", #"while kill -0 "$0" 2>/dev/null; do sleep 0.2; done; /usr/bin/open "$1""#,
+                            String(ProcessInfo.processInfo.processIdentifier), app.path]
+        try? reopen.run()
+        NSApp.terminate(nil)
     }
 
     // MARK: Screen lock

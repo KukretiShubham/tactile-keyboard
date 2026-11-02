@@ -6,6 +6,9 @@ What changed in each release of Tactile. Each release's download is on the [rele
 
 - **Touch Bar:** a MacBook-style strip in place of F1–F12, on by default: esc, the Control Strip, and what Claude and Codex are doing on your Mac. Each shows how much of your plan you've used and how many tasks are working, need you or are done. Tap one to see its tasks, and tap a task to see its steps, what it's doing now, or what it's waiting for you to allow, with a button that opens that chat in the Claude app (or brings Codex forward). Hold fn for F1–F12. Switch Claude, Codex or plan usage off under Settings → Touch Bar.
 - Function Row (Settings → Keyboard) is now **Touch Bar**, **Keys** or **Off**. If you had it switched off, it stays off.
+- **Updates from the menu:** when a new version is out, a dot appears on the Tactile icon and the menu offers **Update to Tactile …** in one row. Tactile downloads it, checks it's a genuine release, replaces itself and reopens; your iPad reconnects and refreshes on its own. It checks once a day (switch that off in the details shown when you hold ⌥), or choose **Check for Updates…**.
+- Releases are now signed with Tactile's own certificate, so macOS keeps Tactile's Accessibility permission across updates. Switch it on once more after installing this version, then never again.
+- Fix: Tactile could, rarely (about one start in 256), fail to set up its secure connection and not start.
 
 ## 1.3.0
 
